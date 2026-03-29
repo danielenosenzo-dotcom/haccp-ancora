@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>HACCP — L'Ancora</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --navy: #0d1f2d;
+    --ocean: #1a3a4a;
+    --teal: #0e7c7b;
+    --teal-light: #12a09f;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --cream: #f5f0e8;
+    --white: #ffffff;
+    --danger: #c0392b;
+    --warning: #e67e22;
+    --ok: #27ae60;
+    --text: #1a1a2e;
+    --muted: #7a8a95;
+    --card: #ffffff;
+    --bg: #f0f4f7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--navy);
+    padding: 20px 16px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    color: var(--gold);
+    font-size: 22px;
+    letter-spacing: 0.5px;
+  }
+  .logo span { color: var(--white); font-size: 13px; display: block; font-family: 'DM Sans', sans-serif; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; }
+  .date-badge {
+    background: var(--teal);
+    color: var(--white);
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* NAV */
+  .nav {
+    display: flex;
+    background: var(--white);
+    border-bottom: 3px solid var(--gold);
+    position: sticky;
+    top: 72px;
+    z-index: 99;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 12px 8px;
+    background: none;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .nav-btn.active {
+    color: var(--teal);
+    border-bottom-color: var(--teal);
+  }
+  .nav-btn .nav-icon { font-size: 20px; display: block; margin-bottom: 3px; }
+
+  /* SECTIONS */
+  .section { display: none; padding: 16px; }
+  .section.active { display: block; }
+
+  /* DASHBOARD */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .dash-card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    cursor: pointer;
+    transition: transform 0.15s;
+    border-top: 4px solid var(--teal);
+  }
+  .dash-card:active { transform: scale(0.97); }
+  .dash-card .dc-icon { font-size: 32px; margin-bottom: 8px; }
+  .dash-card .dc-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .dash-card .dc-value { font-size: 28px; font-weight: 600; color: var(--navy); }
+  .dash-card.danger { border-top-color: var(--danger); }
+  .dash-card.warning { border-top-color: var(--warning); }
+  .dash-card.ok { border-top-color: var(--ok); }
+
+  .alert-box {
+    background: #fff5f5;
+    border: 2px solid var(--danger);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  .alert-box h3 { color: var(--danger); font-size: 14px; margin-bottom: 6px; }
+  .alert-item { font-size: 13px; padding: 4px 0; color: var(--text); }
+
+  /* CARDS */
+  .card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  }
+  .card-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: var(--navy);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--cream);
+  }
+
+  /* FORM */
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #e0e8ed;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    color: var(--text);
+    background: var(--white);
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--teal);
+  }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .temp-display {
+    font-size: 36px;
+    font-weight: 700;
+    text-align: center;
+    padding: 14px;
+    border-radius: 10px;
+    border: 3px solid var(--teal);
+    color: var(--teal);
+  }
+  .temp-display.danger { border-color: var(--danger); color: var(--danger); }
+
+  /* BUTTONS */
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--teal); color: var(--white); }
+  .btn-gold { background: var(--gold); color: var(--navy); }
+  .btn-danger { background: var(--danger); color: var(--white); }
+  .btn-outline { background: transparent; border: 2px solid var(--teal); color: var(--teal); }
+  .btn-sm { padding: 8px 14px; font-size: 13px; border-radius: 8px; width: auto; display: inline-block; }
+
+  /* RECORDS LIST */
+  .record-list { margin-top: 16px; }
+  .record-item {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    border-left: 4px solid var(--teal);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    position: relative;
+  }
+  .record-item.danger { border-left-color: var(--danger); }
+  .record-item.warning { border-left-color: var(--warning); }
+  .record-item .ri-date { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .record-item .ri-title { font-size: 15px; font-weight: 600; color: var(--navy); }
+  .record-item .ri-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .record-item .ri-temp { font-size: 22px; font-weight: 700; color: var(--teal); float: right; }
+  .record-item.danger .ri-temp { color: var(--danger); }
+  .delete-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 4px;
+  }
+
+  /* BADGE */
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-ok { background: #d4edda; color: #155724; }
+  .badge-warning { background: #fff3cd; color: #856404; }
+  .badge-danger { background: #f8d7da; color: #721c24; }
+
+  /* FRIGO SETUP */
+  .frigo-setup {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .frigo-tag {
+    padding: 8px 14px;
+    background: var(--cream);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .frigo-tag.selected { background: var(--teal); color: white; border-color: var(--teal); }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .section-header h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--navy);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--muted);
+  }
+  .empty-state .es-icon { font-size: 48px; margin-bottom: 10px; }
+  .empty-state p { font-size: 14px; }
+
+  /* SCADENZE */
+  .scad-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--white);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .scad-giorni {
+    font-size: 24px;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: center;
+  }
+  .scad-info { flex: 1; padding: 0 12px; }
+  .scad-info .si-name { font-weight: 600; font-size: 15px; color: var(--navy); }
+  .scad-info .si-date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .tabs {
+    display: flex;
+    background: var(--cream);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 16px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 9px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab-btn.active { background: var(--white); color: var(--teal); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+  .divider { height: 1px; background: var(--cream); margin: 14px 0; }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--navy);
+    display: flex;
+    padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+    z-index: 200;
+  }
+  .bn-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(255,255,255,0.4);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color 0.2s;
+  }
+  .bn-btn .bn-icon { font-size: 22px; }
+  .bn-btn.active { color: var(--gold); }
+
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: var(--teal);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 999;
+    transition: transform 0.3s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--danger); }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 300;
+    align-items: flex-end;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--white);
+    border-radius: 20px 20px 0 0;
+    padding: 20px 16px 40px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--navy);
+    margin-bottom: 16px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo">L'Ancora <span>Piano di Autocontrollo</span></div>
+    <div class="date-badge" id="dateBadge"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- SECTIONS -->
+<div class="section active" id="sec-dashboard">
+  <div class="dash-grid">
+    <div class="dash-card ok" onclick="showSection('temperature')">
+      <div class="dc-icon">🌡️</div>
+      <div class="dc-value" id="dash-temp-ok">—</div>
+      <div class="dc-label">Temp. oggi</div>
+    </div>
+    <div class="dash-card" onclick="showSection('cotture')">
+      <div class="dc-icon">♨️</div>
+      <div class="dc-value" id="dash-cotture">—</div>
+      <div class="dc-label">Cotture</div>
+    </div>
+    <div class="dash-card" onclick="showSection('lotti')">
+      <div class="dc-icon">📦</div>
+      <div class="dc-value" id="dash-lotti">—</div>
+      <div class="dc-label">Lotti attivi</div>
+    </div>
+    <div class="dash-card warning" onclick="showSection('scadenze')">
+      <div class="dc-icon">⚠️</div>
+      <div class="dc-value" id="dash-scad">—</div>
+      <div class="dc-label">In scadenza</div>
+    </div>
+  </div>
+  <div class="alert-box" id="alertBox" style="display:none">
+    <h3>⚠️ Attenzione richiesta</h3>
+    <div id="alertList"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Accesso rapido</div>
+    <button class="btn btn-primary" style="margin-bottom:10px" onclick="showSection('temperature')">🌡️ Registra temperatura</button>
+    <button class="btn btn-gold" style="margin-bottom:10px" onclick="showSection('cotture')">♨️ Nuova cottura</button>
+    <button class="btn btn-outline" onclick="showSection('lotti')">📦 Ricevi merce</button>
+  </div>
+</div>
+
+<!-- TEMPERATURE -->
+<div class="section" id="sec-temperature">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('temp','registra',this)">Registra</button>
+    <button class="tab-btn" onclick="switchTab('temp','storico',this)">Storico</button>
+    <button class="tab-btn" onclick="switchTab('temp','attrezzature',this)">Attrezzature</button>
+  </div>
+
+  <div id="temp-registra">
+    <div class="card">
+      <div class="card-title">🌡️ Rilevazione temperature</div>
+      <div class="form-group">
+        <label>Attrezzatura</label>
+        <select id="t-attrezzatura">
+          <option value="">— seleziona —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Temperatura rilevata (°C)</label>
+        <input type="number" id="t-valore" placeholder="es. 3.5" step="0.1" oninput="updateTempDisplay()">
+        <div class="temp-display" id="tempDisplay" style="margin-top:10px">—°C</div>
+      </div>
+      <div class="form-group">
+        <label>Note (opzionale)</label>
+        <input type="text" id="t-note" placeholder="es. porta aperta per carico">
+      </div>
+      <button class="btn btn-primary" onclick="salvaTemperatura()">✓ Salva rilevazione</button>
+    </div>
+  </div>
+
+  <div id="temp-storico" style="display:none">
+    <div class="section-header">
+      <h2>Storico</h2>
+      <select id="filtro-attrezzatura" onchange="renderTemperatureStorico()" style="width:auto;font-size:13px;padding:6px 10px">
+        <option value="">Tutti</option>
+      </select>
+    </div>
+    <div id="temp-storico-list"></div>
+  </div>
+
+  <div id="temp-attrezzature" style="display:none">
+    <div class="card">
+      <div class="card-title">⚙️ Gestione attrezzature</div>
+      <div class="form-group">
+        <label>Nome attrezzatura</label>
+        <input type="text" id="attr-nome" placeholder="es. Frigo pesce, Abbattitore">
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>T° min (°C)</label>
+          <input type="number" id="attr-min" placeholder="-2" step="0.5">
+        </div>
+        <div class="form-group">
+          <label>T° max (°C)</label>
+          <input type="number" id="attr-max" placeholder="4" step="0.5">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="salvaAttrezzatura()">+ Aggiungi</button>
+      <div class="divider"></div>
+      <div id="attr-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- COTTURE -->
+<div class="section" id="sec-cotture">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('cot','registra',this)">Registra</button>
+    <button class="tab-btn" onclick="switchTab('cot','storico',this)">Storico</button>
+  </div>
+
+  <div id="cot-registra">
+    <div class="card">
+      <div class="card-title">♨️ Registro cottura</div>
+      <div class="form-group">
+        <label>Prodotto</label>
+        <input type="text" id="c-prodotto" placeholder="es. Palamita sous vide">
+      </div>
+      <div class="form-group">
+        <label>Metodo</label>
+        <select id="c-metodo">
+          <option>Sous vide</option>
+          <option>Sonicatore</option>
+          <option>Forno</option>
+          <option>Piastra</option>
+          <option>Altro</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>Temperatura (°C)</label>
+          <input type="number" id="c-temp" placeholder="57" step="0.5">
+        </div>
+        <div class="form-group">
+          <label>Durata (min)</label>
+          <input type="number" id="c-durata" placeholder="45">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Lotto / Fornitore</label>
+        <input type="text" id="c-lotto" placeholder="es. Lotto 2024-03 / Fresco Mare">
+      </div>
+      <div class="form-group">
+        <label>Consumo</label>
+        <select id="c-consumo">
+          <option value="immediato">Immediato (servizio diretto)</option>
+          <option value="conservato">Conservato (specificare)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Operatore</label>
+        <input type="text" id="c-operatore" placeholder="nome">
+      </div>
+      <div class="form-group">
+        <label>Note</label>
+        <input type="text" id="c-note" placeholder="opzionale">
+      </div>
+      <button class="btn btn-primary" onclick="salvaCottura()">✓ Salva cottura</button>
+    </div>
+  </div>
+
+  <div id="cot-storico" style="display:none">
+    <div id="cot-storico-list"></div>
+  </div>
+</div>
+
+<!-- LOTTI -->
+<div class="section" id="sec-lotti">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('lot','registra',this)">Ricevi merce</button>
+    <button class="tab-btn" onclick="switchTab('lot','storico',this)">Archivio</button>
+  </div>
+
+  <div id="lot-registra">
+    <div class="card">
+      <div class="card-title">📦 Ricezione merce</div>
+      <div class="form-group">
+        <label>Prodotto</label>
+        <input type="text" id="l-prodotto" placeholder="es. Palamita, Branzino">
+      </div>
+      <div class="form-group">
+        <label>Fornitore</label>
+        <input type="text" id="l-fornitore" placeholder="nome fornitore">
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>N° Documento</label>
+          <input type="text" id="l-ddt" placeholder="DDT / Fattura">
+        </div>
+        <div class="form-group">
+          <label>Lotto</label>
+          <input type="text" id="l-lotto" placeholder="n° lotto">
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>Quantità (kg)</label>
+          <input type="number" id="l-quantita" placeholder="0.0" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>T° arrivo (°C)</label>
+          <input type="number" id="l-temp" placeholder="3" step="0.5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Scadenza / TMC</label>
+        <input type="date" id="l-scadenza">
+      </div>
+      <div class="form-group">
+        <label>Stato al ricevimento</label>
+        <select id="l-stato">
+          <option value="ok">✓ Conforme</option>
+          <option value="warning">⚠️ Accettato con riserva</option>
+          <option value="reject">✗ Respinto</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Note</label>
+        <input type="text" id="l-note" placeholder="opzionale">
+      </div>
+      <button class="btn btn-primary" onclick="salvaLotto()">✓ Registra ricezione</button>
+    </div>
+  </div>
+
+  <div id="lot-storico" style="display:none">
+    <div id="lot-storico-list"></div>
+  </div>
+</div>
+
+<!-- SCADENZE -->
+<div class="section" id="sec-scadenze">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('scad','lista',this)">Prodotti</button>
+    <button class="tab-btn" onclick="switchTab('scad','aggiungi',this)">+ Aggiungi</button>
+  </div>
+
+  <div id="scad-lista">
+    <div id="scad-list"></div>
+  </div>
+
+  <div id="scad-aggiungi" style="display:none">
+    <div class="card">
+      <div class="card-title">📅 Aggiungi prodotto</div>
+      <div class="form-group">
+        <label>Nome prodotto</label>
+        <input type="text" id="s-nome" placeholder="es. Filetti palamita s.v.">
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="s-categoria">
+          <option>Pesce fresco</option>
+          <option>Pesce congelato</option>
+          <option>Semilavorato</option>
+          <option>Condimento/Salsa</option>
+          <option>Verdura</option>
+          <option>Altro</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>Data produzione</label>
+          <input type="date" id="s-prod">
+        </div>
+        <div class="form-group">
+          <label>Data scadenza</label>
+          <input type="date" id="s-scad">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Conservazione</label>
+        <select id="s-conservazione">
+          <option>Frigo (0-4°C)</option>
+          <option>Congelato (-18°C)</option>
+          <option>Temperatura ambiente</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Note</label>
+        <input type="text" id="s-note" placeholder="opzionale">
+      </div>
+      <button class="btn btn-primary" onclick="salvaScadenza()">✓ Aggiungi</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="bn-btn active" onclick="showSection('dashboard')" id="bn-dashboard">
+    <span class="bn-icon">🏠</span>Home
+  </button>
+  <button class="bn-btn" onclick="showSection('temperature')" id="bn-temperature">
+    <span class="bn-icon">🌡️</span>Temp
+  </button>
+  <button class="bn-btn" onclick="showSection('cotture')" id="bn-cotture">
+    <span class="bn-icon">♨️</span>Cotture
+  </button>
+  <button class="bn-btn" onclick="showSection('lotti')" id="bn-lotti">
+    <span class="bn-icon">📦</span>Lotti
+  </button>
+  <button class="bn-btn" onclick="showSection('scadenze')" id="bn-scadenze">
+    <span class="bn-icon">📅</span>Scadenze
+  </button>
+</div>
+
+<script>
+// ===== STORAGE =====
+const DB = {
+  get: (k) => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  getObj: (k, def) => { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } }
+};
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  // Set date
+  const now = new Date();
+  document.getElementById('dateBadge').textContent = now.toLocaleDateString('it-IT', {day:'2-digit',month:'short',year:'numeric'});
+
+  // Default attrezzature
+  if (DB.get('attrezzature').length === 0) {
+    DB.set('attrezzature', [
+      {id: 1, nome: 'Frigo pesce', min: -2, max: 4},
+      {id: 2, nome: 'Frigo verdure', min: 2, max: 6},
+      {id: 3, nome: 'Abbattitore', min: -25, max: -18},
+      {id: 4, nome: 'Freezer', min: -25, max: -18},
+    ]);
+  }
+
+  // Default today date on forms
+  const today = now.toISOString().split('T')[0];
+  ['l-scadenza','s-prod','s-scad'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = today;
+  });
+
+  populateAttrezzatureSelects();
+  renderDashboard();
+  renderAttrezzatureList();
+  renderScadenze();
+});
+
+// ===== NAVIGATION =====
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bn-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  const bn = document.getElementById('bn-' + name);
+  if (bn) bn.classList.add('active');
+
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'temperature') { renderTemperatureStorico(); }
+  if (name === 'cotture') renderCottureStorico();
+  if (name === 'lotti') renderLottiStorico();
+  if (name === 'scadenze') renderScadenze();
+}
+
+function switchTab(prefix, tab, btn) {
+  // Hide all tabs for this prefix
+  document.querySelectorAll(`[id^="${prefix}-"]`).forEach(el => {
+    if (el.tagName !== 'BUTTON') el.style.display = 'none';
+  });
+  // Show selected
+  document.getElementById(prefix + '-' + tab).style.display = 'block';
+  // Update buttons
+  btn.closest('.tabs').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  if (prefix === 'temp' && tab === 'storico') renderTemperatureStorico();
+  if (prefix === 'temp' && tab === 'attrezzature') renderAttrezzatureList();
+  if (prefix === 'cot' && tab === 'storico') renderCottureStorico();
+  if (prefix === 'lot' && tab === 'storico') renderLottiStorico();
+  if (prefix === 'scad' && tab === 'lista') renderScadenze();
+}
+
+// ===== TOAST =====
+function showToast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (type === 'error' ? ' error' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== ATTREZZATURE =====
+function populateAttrezzatureSelects() {
+  const attrs = DB.get('attrezzature');
+  const sel = document.getElementById('t-attrezzatura');
+  const filtro = document.getElementById('filtro-attrezzatura');
+  sel.innerHTML = '<option value="">— seleziona —</option>';
+  filtro.innerHTML = '<option value="">Tutti</option>';
+  attrs.forEach(a => {
+    sel.innerHTML += `<option value="${a.id}">${a.nome} (${a.min}°/${a.max}°C)</option>`;
+    filtro.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
+  });
+}
+
+function salvaAttrezzatura() {
+  const nome = document.getElementById('attr-nome').value.trim();
+  const min = parseFloat(document.getElementById('attr-min').value);
+  const max = parseFloat(document.getElementById('attr-max').value);
+  if (!nome || isNaN(min) || isNaN(max)) { showToast('Compila tutti i campi', 'error'); return; }
+  const attrs = DB.get('attrezzature');
+  attrs.push({ id: Date.now(), nome, min, max });
+  DB.set('attrezzature', attrs);
+  document.getElementById('attr-nome').value = '';
+  document.getElementById('attr-min').value = '';
+  document.getElementById('attr-max').value = '';
+  populateAttrezzatureSelects();
+  renderAttrezzatureList();
+  showToast('Attrezzatura aggiunta ✓');
+}
+
+function renderAttrezzatureList() {
+  const attrs = DB.get('attrezzature');
+  const el = document.getElementById('attr-list');
+  if (!attrs.length) { el.innerHTML = '<div class="empty-state"><p>Nessuna attrezzatura configurata</p></div>'; return; }
+  el.innerHTML = attrs.map(a => `
+    <div class="record-item">
+      <div class="ri-title">${a.nome}</div>
+      <div class="ri-sub">Range: ${a.min}°C / ${a.max}°C</div>
+      <button class="delete-btn" onclick="deleteAttrezzatura(${a.id})">🗑</button>
+    </div>
+  `).join('');
+}
+
+function deleteAttrezzatura(id) {
+  if (!confirm('Eliminare questa attrezzatura?')) return;
+  let attrs = DB.get('attrezzature');
+  attrs = attrs.filter(a => a.id !== id);
+  DB.set('attrezzature', attrs);
+  populateAttrezzatureSelects();
+  renderAttrezzatureList();
+  showToast('Eliminata');
+}
+
+// ===== TEMPERATURE =====
+function updateTempDisplay() {
+  const val = parseFloat(document.getElementById('t-valore').value);
+  const attrId = parseInt(document.getElementById('t-attrezzatura').value);
+  const display = document.getElementById('tempDisplay');
+  if (isNaN(val)) { display.textContent = '—°C'; display.className = 'temp-display'; return; }
+  display.textContent = val.toFixed(1) + '°C';
+  const attrs = DB.get('attrezzature');
+  const attr = attrs.find(a => a.id === attrId);
+  if (attr && (val < attr.min || val > attr.max)) {
+    display.className = 'temp-display danger';
+  } else {
+    display.className = 'temp-display';
+  }
+}
+
+function salvaTemperatura() {
+  const attrId = parseInt(document.getElementById('t-attrezzatura').value);
+  const valore = parseFloat(document.getElementById('t-valore').value);
+  const note = document.getElementById('t-note').value.trim();
+  if (!attrId || isNaN(valore)) { showToast('Seleziona attrezzatura e inserisci temperatura', 'error'); return; }
+
+  const attrs = DB.get('attrezzature');
+  const attr = attrs.find(a => a.id === attrId);
+  const fuoriRange = attr && (valore < attr.min || valore > attr.max);
+
+  const record = {
+    id: Date.now(),
+    attrId,
+    attrNome: attr ? attr.nome : 'Sconosciuta',
+    valore,
+    fuoriRange,
+    note,
+    data: new Date().toISOString(),
+    range: attr ? `${attr.min}/${attr.max}` : ''
+  };
+
+  const temps = DB.get('temperature');
+  temps.unshift(record);
+  DB.set('temperature', temps);
+
+  document.getElementById('t-valore').value = '';
+  document.getElementById('t-note').value = '';
+  document.getElementById('tempDisplay').textContent = '—°C';
+  document.getElementById('tempDisplay').className = 'temp-display';
+
+  if (fuoriRange) {
+    showToast('⚠️ Temperatura fuori range!', 'error');
+  } else {
+    showToast('Temperatura salvata ✓');
+  }
+  renderDashboard();
+}
+
+function renderTemperatureStorico() {
+  const temps = DB.get('temperature');
+  const filtro = parseInt(document.getElementById('filtro-attrezzatura').value);
+  const filtered = filtro ? temps.filter(t => t.attrId === filtro) : temps;
+  const el = document.getElementById('temp-storico-list');
+  if (!filtered.length) { el.innerHTML = '<div class="empty-state"><div class="es-icon">🌡️</div><p>Nessuna rilevazione registrata</p></div>'; return; }
+  el.innerHTML = filtered.map(t => `
+    <div class="record-item ${t.fuoriRange ? 'danger' : ''}">
+      <span class="ri-temp ${t.fuoriRange ? 'danger' : ''}">${t.valore}°</span>
+      <div class="ri-date">${formatDate(t.data)}</div>
+      <div class="ri-title">${t.attrNome}</div>
+      <div class="ri-sub">Range: ${t.range}°C ${t.fuoriRange ? '⚠️ FUORI RANGE' : '✓ OK'}</div>
+      ${t.note ? `<div class="ri-sub">📝 ${t.note}</div>` : ''}
+      <button class="delete-btn" onclick="deleteRecord('temperature',${t.id})">🗑</button>
+    </div>
+  `).join('');
+}
+
+// ===== COTTURE =====
+function salvaCottura() {
+  const prodotto = document.getElementById('c-prodotto').value.trim();
+  const metodo = document.getElementById('c-metodo').value;
+  const temp = parseFloat(document.getElementById('c-temp').value);
+  const durata = parseInt(document.getElementById('c-durata').value);
+  const lotto = document.getElementById('c-lotto').value.trim();
+  const consumo = document.getElementById('c-consumo').value;
+  const operatore = document.getElementById('c-operatore').value.trim();
+  const note = document.getElementById('c-note').value.trim();
+
+  if (!prodotto || isNaN(temp) || isNaN(durata)) { showToast('Compila i campi obbligatori', 'error'); return; }
+
+  const record = { id: Date.now(), prodotto, metodo, temp, durata, lotto, consumo, operatore, note, data: new Date().toISOString() };
+  const cotture = DB.get('cotture');
+  cotture.unshift(record);
+  DB.set('cotture', cotture);
+
+  ['c-prodotto','c-lotto','c-operatore','c-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('c-temp').value = '';
+  document.getElementById('c-durata').value = '';
+  showToast('Cottura registrata ✓');
+  renderDashboard();
+}
+
+function renderCottureStorico() {
+  const cotture = DB.get('cotture');
+  const el = document.getElementById('cot-storico-list');
+  if (!cotture.length) { el.innerHTML = '<div class="empty-state"><div class="es-icon">♨️</div><p>Nessuna cottura registrata</p></div>'; return; }
+  el.innerHTML = cotture.map(c => `
+    <div class="record-item">
+      <div class="ri-date">${formatDate(c.data)}</div>
+      <div class="ri-title">${c.prodotto}</div>
+      <div class="ri-sub">${c.metodo} · <strong>${c.temp}°C</strong> · ${c.durata} min</div>
+      ${c.lotto ? `<div class="ri-sub">📦 ${c.lotto}</div>` : ''}
+      ${c.operatore ? `<div class="ri-sub">👤 ${c.operatore}</div>` : ''}
+      <div style="margin-top:6px"><span class="badge ${c.consumo==='immediato' ? 'badge-ok' : 'badge-warning'}">${c.consumo==='immediato' ? 'Servizio diretto' : 'Conservato'}</span></div>
+      ${c.note ? `<div class="ri-sub" style="margin-top:4px">📝 ${c.note}</div>` : ''}
+      <button class="delete-btn" onclick="deleteRecord('cotture',${c.id})">🗑</button>
+    </div>
+  `).join('');
+}
+
+// ===== LOTTI =====
+function salvaLotto() {
+  const prodotto = document.getElementById('l-prodotto').value.trim();
+  const fornitore = document.getElementById('l-fornitore').value.trim();
+  const ddt = document.getElementById('l-ddt').value.trim();
+  const lotto = document.getElementById('l-lotto').value.trim();
+  const quantita = parseFloat(document.getElementById('l-quantita').value);
+  const temp = parseFloat(document.getElementById('l-temp').value);
+  const scadenza = document.getElementById('l-scadenza').value;
+  const stato = document.getElementById('l-stato').value;
+  const note = document.getElementById('l-note').value.trim();
+
+  if (!prodotto || !fornitore) { showToast('Inserisci prodotto e fornitore', 'error'); return; }
+
+  const record = { id: Date.now(), prodotto, fornitore, ddt, lotto, quantita, temp, scadenza, stato, note, data: new Date().toISOString() };
+  const lotti = DB.get('lotti');
+  lotti.unshift(record);
+  DB.set('lotti', lotti);
+
+  ['l-prodotto','l-fornitore','l-ddt','l-lotto','l-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('l-quantita').value = '';
+  document.getElementById('l-temp').value = '';
+  showToast('Ricezione registrata ✓');
+  renderDashboard();
+}
+
+function renderLottiStorico() {
+  const lotti = DB.get('lotti');
+  const el = document.getElementById('lot-storico-list');
+  if (!lotti.length) { el.innerHTML = '<div class="empty-state"><div class="es-icon">📦</div><p>Nessuna ricezione registrata</p></div>'; return; }
+  el.innerHTML = lotti.map(l => `
+    <div class="record-item ${l.stato === 'reject' ? 'danger' : l.stato === 'warning' ? 'warning' : ''}">
+      <div class="ri-date">${formatDate(l.data)}</div>
+      <div class="ri-title">${l.prodotto}</div>
+      <div class="ri-sub">🏭 ${l.fornitore}</div>
+      ${l.ddt ? `<div class="ri-sub">📄 DDT: ${l.ddt}</div>` : ''}
+      ${l.lotto ? `<div class="ri-sub">📦 Lotto: ${l.lotto}</div>` : ''}
+      <div class="ri-sub">
+        ${!isNaN(l.quantita) && l.quantita > 0 ? `⚖️ ${l.quantita} kg · ` : ''}
+        ${!isNaN(l.temp) ? `🌡️ ${l.temp}°C arrivo` : ''}
+      </div>
+      ${l.scadenza ? `<div class="ri-sub">📅 Scad: ${formatDateStr(l.scadenza)}</div>` : ''}
+      <div style="margin-top:6px">
+        <span class="badge ${l.stato==='ok' ? 'badge-ok' : l.stato==='warning' ? 'badge-warning' : 'badge-danger'}">
+          ${l.stato==='ok' ? '✓ Conforme' : l.stato==='warning' ? '⚠️ Con riserva' : '✗ Respinto'}
+        </span>
+      </div>
+      ${l.note ? `<div class="ri-sub" style="margin-top:4px">📝 ${l.note}</div>` : ''}
+      <button class="delete-btn" onclick="deleteRecord('lotti',${l.id})">🗑</button>
+    </div>
+  `).join('');
+}
+
+// ===== SCADENZE =====
+function salvaScadenza() {
+  const nome = document.getElementById('s-nome').value.trim();
+  const categoria = document.getElementById('s-categoria').value;
+  const prod = document.getElementById('s-prod').value;
+  const scad = document.getElementById('s-scad').value;
+  const conservazione = document.getElementById('s-conservazione').value;
+  const note = document.getElementById('s-note').value.trim();
+
+  if (!nome || !scad) { showToast('Inserisci nome e data scadenza', 'error'); return; }
+
+  const record = { id: Date.now(), nome, categoria, prod, scad, conservazione, note };
+  const scadenze = DB.get('scadenze');
+  scadenze.push(record);
+  scadenze.sort((a,b) => new Date(a.scad) - new Date(b.scad));
+  DB.set('scadenze', scadenze);
+
+  document.getElementById('s-nome').value = '';
+  document.getElementById('s-note').value = '';
+  showToast('Prodotto aggiunto ✓');
+  renderScadenze();
+  renderDashboard();
+}
+
+function renderScadenze() {
+  const scadenze = DB.get('scadenze');
+  const el = document.getElementById('scad-list');
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  if (!scadenze.length) { el.innerHTML = '<div class="empty-state"><div class="es-icon">📅</div><p>Nessun prodotto in archivio</p></div>'; return; }
+
+  el.innerHTML = scadenze.map(s => {
+    const scadDate = new Date(s.scad);
+    const giorni = Math.ceil((scadDate - today) / 86400000);
+    const stato = giorni < 0 ? 'danger' : giorni <= 2 ? 'warning' : 'ok';
+    const label = giorni < 0 ? `Scaduto da ${Math.abs(giorni)}g` : giorni === 0 ? 'Scade oggi' : `${giorni} giorni`;
+    return `
+      <div class="scad-item">
+        <div class="scad-giorni" style="color:${stato==='danger'?'var(--danger)':stato==='warning'?'var(--warning)':'var(--ok)'}">${giorni < 0 ? '!' : giorni}</div>
+        <div class="scad-info">
+          <div class="si-name">${s.nome}</div>
+          <div class="si-date">${s.categoria} · Scad: ${formatDateStr(s.scad)}</div>
+          <div style="margin-top:4px"><span class="badge badge-${stato}">${label}</span></div>
+          ${s.note ? `<div class="si-date" style="margin-top:2px">📝 ${s.note}</div>` : ''}
+        </div>
+        <button style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted)" onclick="deleteRecord('scadenze',${s.id},true)">🗑</button>
+      </div>
+    `;
+  }).join('');
+}
+
+// ===== DASHBOARD =====
+function renderDashboard() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  // Temperature oggi
+  const temps = DB.get('temperature');
+  const tempsOggi = temps.filter(t => t.data.startsWith(todayStr));
+  document.getElementById('dash-temp-ok').textContent = tempsOggi.length;
+
+  // Cotture
+  const cotture = DB.get('cotture');
+  document.getElementById('dash-cotture').textContent = cotture.filter(c => c.data.startsWith(todayStr)).length;
+
+  // Lotti attivi
+  const lotti = DB.get('lotti');
+  document.getElementById('dash-lotti').textContent = lotti.filter(l => l.stato !== 'reject').length;
+
+  // Scadenze prossime (≤3 giorni)
+  const scadenze = DB.get('scadenze');
+  const inScadenza = scadenze.filter(s => {
+    const d = new Date(s.scad);
+    const giorni = Math.ceil((d - today) / 86400000);
+    return giorni <= 3;
+  });
+  document.getElementById('dash-scad').textContent = inScadenza.length;
+
+  // Alert box
+  const alerts = [];
+  temps.filter(t => t.fuoriRange && t.data.startsWith(todayStr)).forEach(t => {
+    alerts.push(`🌡️ ${t.attrNome}: ${t.valore}°C fuori range`);
+  });
+  inScadenza.forEach(s => {
+    const giorni = Math.ceil((new Date(s.scad) - today) / 86400000);
+    alerts.push(`📅 ${s.nome}: ${giorni < 0 ? 'SCADUTO' : giorni === 0 ? 'scade oggi' : `scade in ${giorni}g`}`);
+  });
+
+  const alertBox = document.getElementById('alertBox');
+  const alertList = document.getElementById('alertList');
+  if (alerts.length) {
+    alertBox.style.display = 'block';
+    alertList.innerHTML = alerts.map(a => `<div class="alert-item">• ${a}</div>`).join('');
+  } else {
+    alertBox.style.display = 'none';
+  }
+}
+
+// ===== UTILS =====
+function deleteRecord(key, id, isScad = false) {
+  if (!confirm('Eliminare questo record?')) return;
+  let data = DB.get(key);
+  data = data.filter(r => r.id !== id);
+  DB.set(key, data);
+  if (key === 'temperature') renderTemperatureStorico();
+  if (key === 'cotture') renderCottureStorico();
+  if (key === 'lotti') renderLottiStorico();
+  if (key === 'scadenze') renderScadenze();
+  renderDashboard();
+  showToast('Eliminato');
+}
+
+function formatDate(isoStr) {
+  const d = new Date(isoStr);
+  return d.toLocaleDateString('it-IT', {day:'2-digit',month:'short',year:'numeric'}) + ' ' +
+         d.toLocaleTimeString('it-IT', {hour:'2-digit',minute:'2-digit'});
+}
+
+function formatDateStr(str) {
+  const [y,m,d] = str.split('-');
+  return `${d}/${m}/${y}`;
+}
+</script>
+</body>
+</html>
