@@ -187,7 +187,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v8.5</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v9.1</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -479,6 +479,12 @@ textarea{resize:vertical;min-height:65px}
         <span style="font-size:0.72rem;font-weight:600">Tutta bianca</span>
       </button>
     </div>
+    <!-- SELETTORE LOTTO -->
+    <div id="lottiSelectorBox" style="margin-top:12px">
+      <label style="color:var(--gold)">📦 Seleziona lotto di provenienza</label>
+      <div id="lottiSelectorList" style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:4px"></div>
+    </div>
+
     <label>Fornitore (precompilato da ⚙️ Prodotti)</label>
     <input type="text" id="lbFornitore" placeholder="es. PASAPESCA">
     <label>N° Fattura (precompilato da ⚙️ Prodotti)</label>
@@ -1285,13 +1291,89 @@ function selectProduct(id){
   document.getElementById('labelPreview').style.display='none';
   document.getElementById('btnPDF').style.display='none';
   document.getElementById('printTip').style.display='none';
-  
-  // Precompila fornitore e fattura dai dati prodotto
+
+  // Precompila con ultimo override disponibile
   const pd=getProductData(selectedProduct);
   document.getElementById('lbFornitore').value=pd.supplier||'';
   document.getElementById('lbFattura').value=pd.doc||'';
-  
+
+  // Mostra selettore lotti per questo prodotto
+  renderLottiSelector(selectedProduct);
+
   form.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderLottiSelector(p){
+  const lotti=ls('lotti');
+  if(!lotti.length){
+    document.getElementById('lottiSelectorBox').style.display='none';
+    return;
+  }
+  // Mostra tutti i lotti ordinati per data più recente
+  const lottiProdotto=[...lotti].sort((a,b)=>new Date(b.data||b.date||0)-new Date(a.data||a.date||0));
+
+  // Ordina per data più recente prima (usa campo 'data' o 'date')
+  lottiProdotto.sort((a,b)=>{
+    const da=new Date(a.data||a.date||'1970-01-01');
+    const db=new Date(b.data||b.date||'1970-01-01');
+    return db-da;
+  });
+
+  const box=document.getElementById('lottiSelectorBox');
+  const list=document.getElementById('lottiSelectorList');
+
+  if(!lottiProdotto.length){ box.style.display='none'; return; }
+
+  box.style.display='block';
+  list.innerHTML=lottiProdotto.map((l,i)=>{
+    const isFirst=i===0;
+    return `<div onclick="applyLotto('${l.id}')" style="
+      display:flex;align-items:center;gap:10px;padding:11px 13px;
+      cursor:pointer;border-bottom:1px solid var(--border);
+      background:${isFirst?'rgba(14,124,123,0.12)':'transparent'};
+      transition:background 0.2s" id="lottoOption_${l.id}">
+      <div style="flex:1">
+        <div style="font-size:0.82rem;font-weight:600;color:${isFirst?'var(--teal-l)':'#fff'}">
+          ${isFirst?'⭐ ':''}${l.fornitore||'—'}${l.fattura?' — '+l.fattura:''}
+        </div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:2px">
+          📅 ${fmtDate(l.data||l.date)||l.date||''}${l.temp?' · '+l.temp+'°C ricezione':''}
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--teal-l)">Usa ›</div>
+    </div>`;
+  }).join('');
+
+  // Applica automaticamente il più recente (primo della lista già ordinata)
+  applyLotto(lottiProdotto[0].id, false);
+}
+
+function applyLotto(lottoId, highlight=true){
+  const lotti=ls('lotti');
+  const l=lotti.find(l=>l.id===lottoId);
+  if(!l) return;
+
+  // Evidenzia la riga selezionata
+  document.querySelectorAll('[id^="lottoOption_"]').forEach(el=>{
+    el.style.background='transparent';
+    el.querySelector('div>div:first-child').style.color='#fff';
+  });
+  const sel=document.getElementById('lottoOption_'+lottoId);
+  if(sel && highlight){
+    sel.style.background='rgba(14,124,123,0.2)';
+    sel.querySelector('div>div:first-child').style.color='var(--teal-l)';
+  }
+
+  // Precompila i campi (supporta sia lotti nuovi con 'data' sia vecchi con 'date')
+  const dataLotto=l.data||l.date||'';
+  const docStr=(l.fattura||'')+(dataLotto?' del '+fmtDate(dataLotto):'');
+  document.getElementById('lbFornitore').value=l.fornitore||'';
+  document.getElementById('lbFattura').value=docStr;
+
+  // Resetta anteprima
+  document.getElementById('labelPreview').style.display='none';
+  document.getElementById('btnPDF').style.display='none';
+  document.getElementById('printTip').style.display='none';
 }
 
 function diagLabel(){
