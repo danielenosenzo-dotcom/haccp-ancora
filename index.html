@@ -1344,8 +1344,7 @@ function renderLottiSelector(p){
     </div>`;
   }).join('');
 
-  // Applica automaticamente il più recente (primo della lista già ordinata)
-  applyLotto(lottiProdotto[0].id, false);
+  // NON applicare automaticamente — l'utente sceglie cliccando
 }
 
 function applyLotto(lottoId, highlight=true){
