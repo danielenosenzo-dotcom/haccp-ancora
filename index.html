@@ -1667,13 +1667,13 @@ function buildLabelPageCore(doc, p, dataProd, qta, op, note, style, supplier, do
     doc.line(5,y,75,y);
     y+=5;
     // Ingredienti
-    if(p.ingredients){
+    if(ingredients){
       doc.setFontSize(7);
       doc.setFont('helvetica','bold');
       doc.setTextColor(0);
       doc.text('Ingredienti:',5,y);
       doc.setFont('helvetica','normal');
-      const ing=doc.splitTextToSize(p.ingredients,70);
+      const ing=doc.splitTextToSize(ingredients,70);
       doc.text(ing,5,y+4);
       y+=4+ing.length*3.5+2;
       doc.setDrawColor(180,180,180);
@@ -1686,7 +1686,7 @@ function buildLabelPageCore(doc, p, dataProd, qta, op, note, style, supplier, do
       ['Consumare entro:', fmtDate(dataScad)],
       ['Conservazione:', conservazione],
     ];
-    if(p.supplier) rows.push(['Fornitore:', p.supplier+(p.doc?' '+p.doc:'')]);
+    if(supplier) rows.push(['Fornitore:', supplier+(docNum?' '+docNum:'')]);
     rows.push(['Lotto:', lotto]);
     if(qta) rows.push(['Quantità:', qta]);
     if(op&&op!=='—') rows.push(['Operatore:', op]);
@@ -2075,14 +2075,31 @@ function applyLottoToEdit(lottoId){
   // Evidenzia riga selezionata
   document.querySelectorAll('[id^="editLottoOpt_"]').forEach(el=>{
     el.style.background='transparent';
+    el.querySelector('div>div:first-child').style.color='#fff';
   });
   const sel=document.getElementById('editLottoOpt_'+lottoId);
-  if(sel) sel.style.background='rgba(14,124,123,0.2)';
+  if(sel){
+    sel.style.background='rgba(14,124,123,0.2)';
+    sel.querySelector('div>div:first-child').style.color='var(--teal-l)';
+  }
   // Compila i campi
   const dataLotto=l.data||l.date||'';
   const docStr=(l.fattura||'')+(dataLotto?' del '+fmtDate(dataLotto):'');
   document.getElementById('editFornitore').value=l.fornitore||'';
   document.getElementById('editDoc').value=docStr;
+
+  // Salva automaticamente senza bisogno di cliccare il pulsante
+  if(!editingProductId) return;
+  const ingredients=document.getElementById('editIngredients').value.trim();
+  const overrides=ls('productOverrides');
+  const existing=overrides.findIndex(o=>parseInt(o.id)===parseInt(editingProductId));
+  if(existing>=0){ overrides[existing]={id:editingProductId,supplier:l.fornitore||'',doc:docStr,ingredients}; }
+  else{ overrides.push({id:editingProductId,supplier:l.fornitore||'',doc:docStr,ingredients}); }
+  lss('productOverrides',overrides);
+
+  // Feedback visivo
+  const btn=document.querySelector('#editForm .btn-g');
+  if(btn){ btn.textContent='✅ Lotto salvato!'; setTimeout(()=>{ btn.textContent='💾 Salva modifiche'; },2000); }
 }
 
 function saveProductEdit(){
