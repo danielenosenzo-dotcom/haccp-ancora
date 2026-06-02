@@ -565,6 +565,11 @@ textarea{resize:vertical;min-height:65px}
   <!-- Form modifica -->
   <div class="card" id="editForm" style="display:none">
     <div class="card-t" id="editFormTitle">Modifica prodotto</div>
+    <!-- SELETTORE LOTTI DA FORNITURE REGISTRATE -->
+    <div id="editLottiBox" style="display:none;margin-bottom:14px">
+      <label style="color:var(--gold)">📦 Scegli da forniture registrate</label>
+      <div id="editLottiList" style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:4px;max-height:200px;overflow-y:auto"></div>
+    </div>
     <label>Fornitore</label>
     <input type="text" id="editFornitore" placeholder="es. PASAPESCA">
     <label>Numero documento / fattura</label>
@@ -2029,9 +2034,54 @@ function openEditForm(id){
   // Carica flag Safim
   const safimList=ls('safimProducts');
   document.getElementById('editSafim').checked=safimList.includes(parseInt(p.id));
+  // Mostra lotti disponibili per questo prodotto
+  renderEditLottiSelector(p);
   document.getElementById('editForm').style.display='block';
   document.getElementById('editForm').scrollIntoView({behavior:'smooth',block:'start'});
   renderEditList();
+}
+
+function renderEditLottiSelector(p){
+  const lotti=ls('lotti');
+  const box=document.getElementById('editLottiBox');
+  const list=document.getElementById('editLottiList');
+  if(!lotti.length){ box.style.display='none'; return; }
+  // Ordina per data più recente
+  const sorted=[...lotti].sort((a,b)=>new Date(b.data||b.date||0)-new Date(a.data||a.date||0));
+  box.style.display='block';
+  list.innerHTML=sorted.map((l,i)=>`
+    <div onclick="applyLottoToEdit('${l.id}')" style="
+      display:flex;align-items:center;gap:10px;padding:10px 13px;
+      cursor:pointer;border-bottom:1px solid var(--border);
+      background:transparent;transition:background 0.15s"
+      id="editLottoOpt_${l.id}">
+      <div style="flex:1">
+        <div style="font-size:0.82rem;font-weight:600;color:#fff">
+          ${l.fornitore||'—'}${l.fattura?' — '+l.fattura:''}
+        </div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:2px">
+          📅 ${fmtDate(l.data||l.date)||''}
+          ${l.prod?'<br><span style="font-size:0.65rem;color:var(--teal-l)">'+l.prod.substring(0,60)+(l.prod.length>60?'...':'')+'</span>':''}
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--teal-l);flex-shrink:0">Usa ›</div>
+    </div>`).join('');
+}
+
+function applyLottoToEdit(lottoId){
+  const l=ls('lotti').find(l=>l.id===lottoId);
+  if(!l) return;
+  // Evidenzia riga selezionata
+  document.querySelectorAll('[id^="editLottoOpt_"]').forEach(el=>{
+    el.style.background='transparent';
+  });
+  const sel=document.getElementById('editLottoOpt_'+lottoId);
+  if(sel) sel.style.background='rgba(14,124,123,0.2)';
+  // Compila i campi
+  const dataLotto=l.data||l.date||'';
+  const docStr=(l.fattura||'')+(dataLotto?' del '+fmtDate(dataLotto):'');
+  document.getElementById('editFornitore').value=l.fornitore||'';
+  document.getElementById('editDoc').value=docStr;
 }
 
 function saveProductEdit(){
