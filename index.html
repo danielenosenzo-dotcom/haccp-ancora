@@ -203,6 +203,7 @@ textarea{resize:vertical;min-height:65px}
   <button class="nb" onclick="show('prodotti',this)"><span class="ic">⚙️</span>Prodotti</button>
   <button class="nb" onclick="show('pulizie',this)"><span class="ic">🧼</span>Pulizie</button>
   <button class="nb" onclick="show('magazzino',this)"><span class="ic">🏭</span>Magazzino</button>
+  <button class="nb" onclick="show('presenze',this)"><span class="ic">👥</span>Presenze</button>
 </nav>
 
 <!-- ═══════════════════════════════ HOME ═══════════════════════════════ -->
@@ -2905,6 +2906,252 @@ function initApp(){
   renderHome();
 }
 </script>
+
+<!-- ══════════════════════════════════════════
+     SEZIONE PRESENZE
+══════════════════════════════════════════ -->
+<section class="sec" id="presenze">
+  <div class="card-t" style="font-size:1.1rem;margin-bottom:16px">👥 Presenze Dipendenti</div>
+
+  <!-- VISTA DIPENDENTE: seleziona nome e timbra -->
+  <div id="pres-dipendente">
+    <div class="card">
+      <div class="card-t">Chi sei?</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px" id="pres-nomi">
+        <button class="btn btn-o pres-nome-btn" onclick="presSeleziona('Adam',this)">👨‍🍳 Adam</button>
+        <button class="btn btn-o pres-nome-btn" onclick="presSeleziona('Alessio',this)">👨‍🍳 Alessio</button>
+        <button class="btn btn-o pres-nome-btn" onclick="presSeleziona('Dalia',this)">👩‍🍳 Dalia</button>
+        <button class="btn btn-o pres-nome-btn" onclick="presSeleziona('Roberta',this)">🍽️ Roberta</button>
+        <button class="btn btn-o pres-nome-btn" style="grid-column:1/-1" onclick="presSeleziona('Stefano',this)">🍽️ Stefano</button>
+      </div>
+      <div id="pres-azioni" style="display:none">
+        <div style="text-align:center;font-size:1rem;font-weight:600;color:var(--gold);margin-bottom:16px" id="pres-nome-sel"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <button class="btn btn-t" style="margin-top:0;font-size:1.1rem" onclick="presTimbra('entrata')">🟢 Entrata</button>
+          <button class="btn btn-d" style="margin-top:0;font-size:1.1rem" onclick="presTimbra('uscita')">🔴 Uscita</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="btn btn-o" style="margin-top:0;font-size:0.85rem" onclick="presTimbra('ferie')">🏖️ Ferie</button>
+          <button class="btn btn-o" style="margin-top:0;font-size:0.85rem" onclick="presTimbra('malattia')">🤒 Malattia</button>
+        </div>
+        <div id="pres-stato-oggi" style="margin-top:16px;padding:12px;background:rgba(14,124,123,0.1);border-radius:10px;border:1px solid var(--border);font-size:0.82rem;color:var(--muted);text-align:center">
+          Caricamento...
+        </div>
+      </div>
+    </div>
+
+    <!-- VISTA ADMIN -->
+    <div class="card">
+      <div class="card-t">📊 Admin — Oggi</div>
+      <div id="pres-admin-oggi">
+        <div style="text-align:center;color:var(--muted);font-size:0.82rem;padding:20px">
+          Caricamento presenze...
+        </div>
+      </div>
+      <button class="btn btn-o btn-sm" style="margin-top:12px" onclick="presReport()">📄 Report Mensile</button>
+    </div>
+  </div>
+
+  <!-- REPORT MENSILE -->
+  <div id="pres-report" style="display:none">
+    <button class="btn btn-o btn-sm" style="margin-bottom:12px" onclick="document.getElementById('pres-report').style.display='none';document.getElementById('pres-dipendente').style.display='block'">← Torna</button>
+    <div class="card">
+      <div class="card-t">📄 Report Mensile</div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+        <select id="pres-mese-sel" onchange="presCaricaReport()" style="flex:1">
+        </select>
+      </div>
+      <div id="pres-report-body"></div>
+      <button class="btn btn-g" style="margin-top:12px" onclick="presEsportaReport()">⬇️ Scarica PDF</button>
+    </div>
+  </div>
+</section>
+
+<script>
+// ══════════════════════════════════════════
+// MODULO PRESENZE
+// ══════════════════════════════════════════
+
+const DIPENDENTI = [
+  {nome:'Adam',   reparto:'Cucina'},
+  {nome:'Alessio',reparto:'Cucina'},
+  {nome:'Dalia',  reparto:'Cucina'},
+  {nome:'Roberta',reparto:'Sala'},
+  {nome:'Stefano',reparto:'Sala'},
+];
+
+let presNomeSelezionato = null;
+
+function presSeleziona(nome, btn) {
+  presNomeSelezionato = nome;
+  document.querySelectorAll('.pres-nome-btn').forEach(b => {
+    b.className = 'btn btn-o pres-nome-btn';
+    b.style.gridColumn = '';
+  });
+  if (nome === 'Stefano') btn.style.gridColumn = '1/-1';
+  btn.className = 'btn btn-g pres-nome-btn';
+  document.getElementById('pres-nome-sel').textContent = '👤 ' + nome;
+  document.getElementById('pres-azioni').style.display = 'block';
+  presCaricaStatoOggi(nome);
+  presCaricaAdminOggi();
+}
+
+function presOggi() {
+  return new Date().toISOString().slice(0,10);
+}
+
+function presOraCorrente() {
+  return new Date().toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+}
+
+async function presTimbra(tipo) {
+  if (!presNomeSelezionato) return;
+  const ora = presOraCorrente();
+  const oggi = presOggi();
+  const docId = presNomeSelezionato + '_' + oggi;
+  const ref = db.collection('presenze').doc(docId);
+
+  try {
+    const doc = await ref.get();
+    const data = doc.exists ? doc.data() : {nome: presNomeSelezionato, data: oggi, timbrature: []};
+    data.timbrature = data.timbrature || [];
+    data.timbrature.push({tipo, ora, ts: Date.now()});
+    await ref.set(data);
+
+    const msg = {
+      'entrata': '✅ Entrata registrata alle ' + ora,
+      'uscita':  '✅ Uscita registrata alle ' + ora,
+      'ferie':   '🏖️ Ferie registrate',
+      'malattia':'🤒 Malattia registrata'
+    }[tipo];
+
+    document.getElementById('pres-stato-oggi').innerHTML =
+      '<span style="color:var(--success);font-weight:600">' + msg + '</span>';
+    presCaricaStatoOggi(presNomeSelezionato);
+    presCaricaAdminOggi();
+  } catch(e) {
+    alert('Errore: ' + e.message);
+  }
+}
+
+async function presCaricaStatoOggi(nome) {
+  const docId = nome + '_' + presOggi();
+  try {
+    const doc = await db.collection('presenze').doc(docId).get();
+    const el = document.getElementById('pres-stato-oggi');
+    if (!doc.exists || !doc.data().timbrature?.length) {
+      el.innerHTML = '<span style="color:var(--muted)">Nessuna timbratura oggi</span>';
+      return;
+    }
+    const timb = doc.data().timbrature;
+    el.innerHTML = timb.map(t => {
+      const icone = {entrata:'🟢',uscita:'🔴',ferie:'🏖️',malattia:'🤒'};
+      return '<div style="margin:4px 0"><span style="color:var(--gold)">' + (icone[t.tipo]||'•') + ' ' + t.tipo.toUpperCase() + '</span> — ' + t.ora + '</div>';
+    }).join('');
+  } catch(e) {}
+}
+
+async function presCaricaAdminOggi() {
+  const oggi = presOggi();
+  const el = document.getElementById('pres-admin-oggi');
+  try {
+    const snap = await db.collection('presenze').where('data','==',oggi).get();
+    if (snap.empty) {
+      el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:0.82rem;padding:12px">Nessuna presenza registrata oggi</div>';
+      return;
+    }
+    const presMap = {};
+    snap.forEach(d => { presMap[d.data().nome] = d.data(); });
+
+    el.innerHTML = DIPENDENTI.map(dip => {
+      const dati = presMap[dip.nome];
+      const timb = dati?.timbrature || [];
+      const ultima = timb.length ? timb[timb.length-1] : null;
+      const icone = {entrata:'🟢',uscita:'🔴',ferie:'🏖️',malattia:'🤒'};
+      const stato = ultima
+        ? '<span style="color:' + (ultima.tipo==='entrata'?'var(--success)':ultima.tipo==='uscita'?'var(--danger)':'var(--gold)') + '">' + (icone[ultima.tipo]||'') + ' ' + ultima.tipo + ' ' + ultima.ora + '</span>'
+        : '<span style="color:var(--muted)">— assente</span>';
+      return '<div class="li" style="margin-bottom:6px"><div><div style="font-weight:600">' + dip.nome + '</div><div class="li-meta">' + dip.reparto + '</div></div><div style="font-size:0.82rem">' + stato + '</div></div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Errore caricamento</div>';
+  }
+}
+
+function presReport() {
+  document.getElementById('pres-dipendente').style.display = 'none';
+  document.getElementById('pres-report').style.display = 'block';
+  // Popola mesi
+  const sel = document.getElementById('pres-mese-sel');
+  sel.innerHTML = '';
+  const oggi = new Date();
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(oggi.getFullYear(), oggi.getMonth() - i, 1);
+    const val = d.toISOString().slice(0,7);
+    const label = d.toLocaleDateString('it-IT', {month:'long', year:'numeric'});
+    sel.innerHTML += '<option value="' + val + '">' + label + '</option>';
+  }
+  presCaricaReport();
+}
+
+async function presCaricaReport() {
+  const mese = document.getElementById('pres-mese-sel').value;
+  const el = document.getElementById('pres-report-body');
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px">Caricamento...</div>';
+  try {
+    const snap = await db.collection('presenze').where('data','>=',mese+'-01').where('data','<=',mese+'-31').get();
+    const datiPerNome = {};
+    DIPENDENTI.forEach(d => { datiPerNome[d.nome] = []; });
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (datiPerNome[d.nome] !== undefined) datiPerNome[d.nome].push(d);
+    });
+
+    el.innerHTML = DIPENDENTI.map(dip => {
+      const giorni = datiPerNome[dip.nome];
+      let entrateOre = 0, ferie = 0, malattia = 0, giorniLavorati = 0;
+      giorni.forEach(g => {
+        const timb = g.timbrature || [];
+        const hasFerie = timb.some(t => t.tipo === 'ferie');
+        const haMalattia = timb.some(t => t.tipo === 'malattia');
+        const entrata = timb.find(t => t.tipo === 'entrata');
+        const uscita = timb.find(t => t.tipo === 'uscita');
+        if (hasFerie) ferie++;
+        else if (haMalattia) malattia++;
+        else if (entrata && uscita) {
+          giorniLavorati++;
+          const [he,me] = entrata.ora.split(':').map(Number);
+          const [hu,mu] = uscita.ora.split(':').map(Number);
+          entrateOre += (hu*60+mu - he*60-me) / 60;
+        } else if (entrata) { giorniLavorati++; }
+      });
+      return '<div class="card" style="margin-bottom:8px"><div style="font-weight:700;color:var(--gold);margin-bottom:8px">' + dip.nome + ' <span style="font-size:0.7rem;color:var(--muted)">(' + dip.reparto + ')</span></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;text-align:center">' +
+        '<div class="sc" style="padding:8px"><div class="sc-n" style="font-size:1.3rem">' + giorniLavorati + '</div><div class="sc-l">Giorni</div></div>' +
+        '<div class="sc" style="padding:8px"><div class="sc-n" style="font-size:1.3rem">' + entrateOre.toFixed(1) + 'h</div><div class="sc-l">Ore</div></div>' +
+        '<div class="sc" style="padding:8px"><div class="sc-n" style="font-size:1.3rem;color:var(--gold)">' + ferie + '</div><div class="sc-l">Ferie</div></div>' +
+        '<div class="sc" style="padding:8px"><div class="sc-n" style="font-size:1.3rem;color:var(--danger)">' + malattia + '</div><div class="sc-l">Malattia</div></div>' +
+        '</div></div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--danger)">Errore: ' + e.message + '</div>';
+  }
+}
+
+function presEsportaReport() {
+  const mese = document.getElementById('pres-mese-sel').value;
+  const contenuto = document.getElementById('pres-report-body').innerText;
+  const blob = new Blob(['REPORT PRESENZE — ' + mese + '\nRistorante L\'Ancora\n\n' + contenuto], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'presenze_' + mese + '.txt'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Carica admin all'apertura sezione presenze
+const _showOrig = typeof show === 'function' ? show : null;
+</script>
+
 </div><!-- appContent -->
 </body>
 </html>
