@@ -203,7 +203,6 @@ textarea{resize:vertical;min-height:65px}
   <button class="nb" onclick="show('prodotti',this)"><span class="ic">⚙️</span>Prodotti</button>
   <button class="nb" onclick="show('pulizie',this)"><span class="ic">🧼</span>Pulizie</button>
   <button class="nb" onclick="show('magazzino',this)"><span class="ic">🏭</span>Magazzino</button>
-  <button class="nb" onclick="show('presenze',this)"><span class="ic">👥</span>Presenze</button>
 </nav>
 
 <!-- ═══════════════════════════════ HOME ═══════════════════════════════ -->
@@ -2904,13 +2903,28 @@ function initApp(){
   renderChecklist('giornaliera');
   renderPulizieLog('giornaliera');
   renderHome();
+  eliminaScaduteAuto();
+}
+
+// Elimina automaticamente le scadenze con data passata
+async function eliminaScaduteAuto() {
+  try {
+    const scads = ls('scadenze');
+    const oggi = new Date(); oggi.setHours(0,0,0,0);
+    const valide = scads.filter(s => new Date(s.scad) >= oggi);
+    const eliminate = scads.length - valide.length;
+    if (eliminate > 0) {
+      lss('scadenze', valide);
+      renderScadenze();
+      renderHome();
+      console.log('Eliminate ' + eliminate + ' scadenze passate');
+    }
+  } catch(e) { console.warn('Errore pulizia scadenze:', e); }
 }
 </script>
 
-<!-- ══════════════════════════════════════════
-     SEZIONE PRESENZE
-══════════════════════════════════════════ -->
-<section class="sec" id="presenze">
+<!-- SEZIONE PRESENZE - RIMOSSA, APP SEPARATA -->
+<section class="sec" id="presenze" style="display:none!important">
   <div class="card-t" style="font-size:1.1rem;margin-bottom:16px">👥 Presenze Dipendenti</div>
 
   <!-- VISTA DIPENDENTE: seleziona nome e timbra -->
@@ -3148,8 +3162,7 @@ function presEsportaReport() {
   URL.revokeObjectURL(url);
 }
 
-// Carica admin all'apertura sezione presenze
-const _showOrig = typeof show === 'function' ? show : null;
+
 </script>
 
 </div><!-- appContent -->
