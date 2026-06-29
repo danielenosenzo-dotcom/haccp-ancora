@@ -1050,7 +1050,7 @@ async function loadLiveCelle(){
   const box = document.getElementById('liveCelleList');
   const agg = document.getElementById('liveCelleAgg');
   try {
-    const snap = await db.collection('celle_live').get();
+    const snap = await firestoreDb.collection('celle_live').get();
     if(snap.empty){ box.innerHTML='<div style="font-size:0.78rem;color:var(--muted);padding:8px">Nessun dato disponibile</div>'; return; }
     const celle = [];
     snap.forEach(doc => celle.push(doc.data()));
