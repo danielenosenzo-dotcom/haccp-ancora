@@ -235,6 +235,18 @@ textarea{resize:vertical;min-height:65px}
 <!-- ═══════════════════════════════ TEMPERATURE ═══════════════════════════════ -->
 <section class="sec" id="temp">
 
+  <!-- LIVE CELLE AUTOMATICHE -->
+  <div class="card" id="liveCelleCard">
+    <div class="card-t" style="display:flex;align-items:center;justify-content:space-between">
+      <span>📡 Celle in tempo reale</span>
+      <span id="liveCelleAgg" style="font-size:0.6rem;color:var(--muted)">Caricamento...</span>
+    </div>
+    <div id="liveCelleList">
+      <div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Connessione in corso...</div></div>
+    </div>
+    <button class="btn btn-o" style="margin-top:10px;font-size:0.75rem;padding:8px" onclick="loadLiveCelle()">🔄 Aggiorna</button>
+  </div>
+
   <!-- PULSANTI RAPIDI CELLE -->
   <div class="card">
     <div class="card-t">⚡ Registrazione Rapida</div>
@@ -984,7 +996,7 @@ function show(id,btn){
   if(btn) btn.classList.add('on');
   if(id==='home') renderHome();
   if(id==='scad') renderScadenze();
-  if(id==='temp'){document.getElementById('tOra').value=nowTime();}
+  if(id==='temp'){document.getElementById('tOra').value=nowTime(); loadLiveCelle();}
   if(id==='label') renderProducts('Tutti');
 }
 
@@ -1031,6 +1043,37 @@ function renderHome(){
 // ═══════════════════════════════════════════════════════
 // TEMPERATURE
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// LIVE CELLE DA FIREBASE
+// ═══════════════════════════════════════════════════════
+async function loadLiveCelle(){
+  const box = document.getElementById('liveCelleList');
+  const agg = document.getElementById('liveCelleAgg');
+  try {
+    const snap = await db.collection('celle_live').get();
+    if(snap.empty){ box.innerHTML='<div style="font-size:0.78rem;color:var(--muted);padding:8px">Nessun dato disponibile</div>'; return; }
+    const celle = [];
+    snap.forEach(doc => celle.push(doc.data()));
+    celle.sort((a,b) => a.zona.localeCompare(b.zona));
+    box.innerHTML = celle.map(c => {
+      const cls = c.status === 'anomalia' ? 'li li-danger' : c.status === 'offline' ? 'li li-warn' : 'li li-l';
+      const icon = c.status === 'anomalia' ? '🚨' : c.status === 'offline' ? '⚠️' : '✅';
+      const ts = c.timestamp ? new Date(c.timestamp.seconds*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '--:--';
+      return `<div class="${cls}">
+        <div>
+          <div style="font-size:0.82rem;font-weight:600">${icon} ${c.zona}</div>
+          <div class="li-meta">Range: ${c.min}°C / ${c.max}°C · ore ${ts}</div>
+        </div>
+        <div class="li-val">${c.temp !== undefined ? c.temp+'°C' : 'N/D'}</div>
+      </div>`;
+    }).join('');
+    agg.textContent = 'Aggiornato ' + new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    box.innerHTML = '<div style="font-size:0.78rem;color:var(--danger);padding:8px">Errore connessione Firebase</div>';
+    console.error(e);
+  }
+}
+
 function saveTemp(){
   const zona=document.getElementById('tZona').value;
   const val=parseFloat(document.getElementById('tVal').value);
