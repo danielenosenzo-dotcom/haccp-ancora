@@ -2,6 +2,11 @@ const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args
 const { createHmac } = require('crypto');
 const admin = require('firebase-admin');
 
+console.log('FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID ? 'OK' : 'MANCANTE');
+console.log('FIREBASE_CLIENT_EMAIL:', process.env.FIREBASE_CLIENT_EMAIL ? 'OK' : 'MANCANTE');
+console.log('FIREBASE_PRIVATE_KEY:', process.env.FIREBASE_PRIVATE_KEY ? 'OK' : 'MANCANTE');
+console.log('EWELINK_APP_ID:', process.env.EWELINK_APP_ID ? 'OK' : 'MANCANTE');
+
 const DEVICES = [
   { id: '1000bcc9a0', name: 'Frigo porta',    zona: 'Frigo porta (Surgelati)',   min: -22, max: -15 },
   { id: '100102f32a', name: 'CELLA FRESCO',   zona: 'Cella Fresco',              min: -3,  max:  4  },
