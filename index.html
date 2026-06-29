@@ -1050,7 +1050,8 @@ async function loadLiveCelle(){
   const box = document.getElementById('liveCelleList');
   const agg = document.getElementById('liveCelleAgg');
   try {
-    const snap = await firestoreDb.collection('celle_live').get();
+    const fdb = firestoreDb || firebase.firestore();
+    const snap = await fdb.collection('celle_live').get();
     if(snap.empty){ box.innerHTML='<div style="font-size:0.78rem;color:var(--muted);padding:8px">Nessun dato disponibile</div>'; return; }
     const celle = [];
     snap.forEach(doc => celle.push(doc.data()));
@@ -1069,7 +1070,7 @@ async function loadLiveCelle(){
     }).join('');
     agg.textContent = 'Aggiornato ' + new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
   } catch(e) {
-    box.innerHTML = '<div style="font-size:0.78rem;color:var(--danger);padding:8px">Errore connessione Firebase</div>';
+    box.innerHTML = `<div style="font-size:0.78rem;color:var(--danger);padding:8px">Errore: ${e.message||e}</div>`;
     console.error(e);
   }
 }
