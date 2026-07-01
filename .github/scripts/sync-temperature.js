@@ -2,14 +2,16 @@ const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args
 const { createHmac } = require('crypto');
 const admin = require('firebase-admin');
 
-console.log('FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID ? 'OK' : 'MANCANTE');
-console.log('FIREBASE_CLIENT_EMAIL:', process.env.FIREBASE_CLIENT_EMAIL ? 'OK' : 'MANCANTE');
-console.log('FIREBASE_PRIVATE_KEY:', process.env.FIREBASE_PRIVATE_KEY ? 'OK' : 'MANCANTE');
-console.log('EWELINK_APP_ID:', process.env.EWELINK_APP_ID ? 'OK' : 'MANCANTE');
-
 const DEVICES = [
-  { id: '1000bcc9a0', name: 'Frigo porta',    zona: 'Frigo porta (Surgelati)',   min: -22, max: -15 },
-  { id: '100102f32a', name: 'CELLA FRESCO',   zona: 'Cella Fresco',              min: -3,  max:  4  },
+  // CANTINA — Bassa Temperatura
+  { id: '1000bcc9a0', zona: 'Cella BT Cantina 1', zona_gruppo: 'Cantina', min: -22, max: -15 },
+  { id: '100072ac7d', zona: 'Cella BT Cantina 2', zona_gruppo: 'Cantina', min: -22, max: -15 },
+  // CUCINA — Temperature Positive
+  { id: '100102f32a', zona: 'Cella Frigo Cucina', zona_gruppo: 'Cucina',  min: 0,   max: 4  },
+];
+
+const NO_SENSOR = [
+  { id: 'ns_dolci', zona: 'Cella Frigo Dolci', zona_gruppo: 'Cucina', min: 0, max: 4 },
 ];
 
 const APP_ID     = process.env.EWELINK_APP_ID;
@@ -26,8 +28,7 @@ admin.initializeApp({
 const db = admin.firestore();
 
 async function refreshAccessToken() {
-  const refreshToken = process.env.EWELINK_REFRESH_TOKEN;
-  const body = JSON.stringify({ grantType: 'refresh_token', refreshToken });
+  const body = JSON.stringify({ grantType: 'refresh_token', refreshToken: process.env.EWELINK_REFRESH_TOKEN });
   const sign = createHmac('sha256', APP_SECRET).update(body).digest('base64');
   const res = await fetch(`${BASE_URL}/v2/user/oauth/token`, {
     method: 'POST',
@@ -35,7 +36,7 @@ async function refreshAccessToken() {
     body,
   });
   const json = await res.json();
-  if (json.error !== 0) throw new Error(`Refresh token failed: ${JSON.stringify(json)}`);
+  if (json.error !== 0) throw new Error(`Refresh failed: ${JSON.stringify(json)}`);
   return json.data.accessToken;
 }
 
@@ -49,42 +50,40 @@ async function getDevices(token) {
 }
 
 async function main() {
-  console.log('Sync temperature eWeLink → Firebase avviato');
+  console.log('Sync temperature eWeLink → Firebase');
   let token = process.env.EWELINK_ACCESS_TOKEN;
   let thingList;
-  try {
-    thingList = await getDevices(token);
-  } catch {
-    console.log('Access token scaduto, refresh in corso...');
-    token = await refreshAccessToken();
-    thingList = await getDevices(token);
-  }
+  try { thingList = await getDevices(token); }
+  catch { token = await refreshAccessToken(); thingList = await getDevices(token); }
 
   const now = new Date();
   const batch = db.batch();
 
   for (const device of DEVICES) {
     const thing = thingList.find(t => t.itemData.deviceid === device.id);
-    if (!thing) { console.log(`${device.name} non trovato`); continue; }
-
-    const params = thing.itemData.params;
-    const online = thing.itemData.online;
-    const temp = params.currentTemperature !== undefined && params.currentTemperature !== 'unavailable'
-      ? parseFloat(params.currentTemperature) : null;
-
-    if (temp === null) { console.log(`${device.name} - temperatura non disponibile`); continue; }
-
-    const outOfRange = temp < device.min || temp > device.max;
+    const online = thing ? thing.itemData.online : false;
+    const params = thing ? thing.itemData.params : {};
+    const tempRaw = params.currentTemperature;
+    const temp = tempRaw !== undefined && tempRaw !== 'unavailable' ? parseFloat(tempRaw) : null;
+    const outOfRange = temp !== null && (temp < device.min || temp > device.max);
     const status = !online ? 'offline' : outOfRange ? 'anomalia' : 'ok';
-
     const record = {
-      zona: device.zona, deviceId: device.id, temp, min: device.min, max: device.max,
-      status, online, timestamp: admin.firestore.Timestamp.fromDate(now), source: 'ewelink-auto',
+      zona: device.zona, zona_gruppo: device.zona_gruppo, deviceId: device.id,
+      temp, min: device.min, max: device.max, status, online,
+      timestamp: admin.firestore.Timestamp.fromDate(now), source: 'ewelink-auto',
     };
-
     batch.set(db.collection('celle_live').doc(device.id), record);
     batch.set(db.collection('temperature').doc(), { ...record, operatore: 'Sistema automatico' });
-    console.log(`${device.name}: ${temp}°C [${status}]`);
+    console.log(`${device.zona}: ${temp !== null ? temp+'°C' : 'N/D'} [${status}]`);
+  }
+
+  for (const ns of NO_SENSOR) {
+    batch.set(db.collection('celle_live').doc(ns.id), {
+      zona: ns.zona, zona_gruppo: ns.zona_gruppo, deviceId: ns.id,
+      temp: null, min: ns.min, max: ns.max, status: 'no_sensor', online: false,
+      timestamp: admin.firestore.Timestamp.fromDate(now), source: 'no-sensor',
+    });
+    console.log(`${ns.zona}: in attesa sensore`);
   }
 
   await batch.commit();
@@ -92,3 +91,4 @@ async function main() {
 }
 
 main().catch(err => { console.error('Errore:', err); process.exit(1); });
+
