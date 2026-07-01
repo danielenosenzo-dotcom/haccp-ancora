@@ -247,88 +247,24 @@ textarea{resize:vertical;min-height:65px}
     <button class="btn btn-o" style="margin-top:10px;font-size:0.75rem;padding:8px" onclick="loadLiveCelle()">🔄 Aggiorna</button>
   </div>
 
-  <!-- PULSANTI RAPIDI CELLE -->
+  <!-- REGISTRAZIONE ASL GIORNALIERA -->
   <div class="card">
-    <div class="card-t">⚡ Registrazione Rapida</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
-      <button class="celle-btn" onclick="quickTemp('Cella n.1 (Verdure/Pesce)','0-4','❄️')">
-        <span class="celle-icon">❄️</span>
-        <span class="celle-name">Cella n.1</span>
-        <span class="celle-sub">Verdure / Pesce</span>
-        <span class="celle-range">0 – 4°C</span>
-      </button>
-      <button class="celle-btn" onclick="quickTemp('Frigo Colonna A (Dolci)','0-4','🍮')">
-        <span class="celle-icon">🍮</span>
-        <span class="celle-name">Frigo Col. A</span>
-        <span class="celle-sub">Dolci preparati</span>
-        <span class="celle-range">0 – 4°C</span>
-      </button>
-      <button class="celle-btn" onclick="quickTemp('Frigo Colonna B (Latticini/Pasta)','0-4','🧀')">
-        <span class="celle-icon">🧀</span>
-        <span class="celle-name">Frigo Col. B</span>
-        <span class="celle-sub">Latticini / Pasta</span>
-        <span class="celle-range">0 – 4°C</span>
-      </button>
-
-      <button class="celle-btn" onclick="quickTemp('Cella Surgelati 1 (Cantina)','surgelati','🥶')">
-        <span class="celle-icon">🥶</span>
-        <span class="celle-name">Surgelati 1</span>
-        <span class="celle-sub">Cantina</span>
-        <span class="celle-range">-18°C</span>
-      </button>
-      <button class="celle-btn" onclick="quickTemp('Cella Surgelati 2 (Cantina)','surgelati','🥶')">
-        <span class="celle-icon">🥶</span>
-        <span class="celle-name">Surgelati 2</span>
-        <span class="celle-sub">Cantina</span>
-        <span class="celle-range">-18°C</span>
-      </button>
-    </div>
-    <div id="quickTempForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-      <div id="quickTempTitle" style="font-size:0.85rem;font-weight:600;color:var(--teal-l);margin-bottom:10px"></div>
-      <label>Temperatura rilevata (°C)</label>
-      <input type="number" id="qVal" placeholder="es. 2.5" step="0.1">
-      <label>Operatore</label>
-      <select id="qOp" onchange="checkOtherOp('qOp','qOpAlt')">
-        <option value="">— Seleziona —</option>
-      </select>
-      <input type="text" id="qOpAlt" placeholder="Nome operatore" style="display:none;margin-top:8px">
-      <label>Note (opzionale)</label>
-      <input type="text" id="qNote" placeholder="es. porta aperta, anomalia...">
-      <div id="quickTempAlert" style="display:none;background:rgba(224,92,92,0.15);border:1px solid var(--danger);border-radius:8px;padding:10px;margin-top:10px;font-size:0.78rem;color:var(--danger)"></div>
-      <button class="btn btn-g" onclick="saveQuickTemp()">💾 Registra</button>
-      <button class="btn btn-o" onclick="closeQuickTemp()" style="margin-top:6px">Annulla</button>
-    </div>
-  </div>
-
-  <!-- FORM MANUALE -->
-  <div class="card">
-    <div class="card-t">🌡️ Registrazione Manuale</div>
-    <label>Zona / Apparecchio</label>
-    <select id="tZona">
-      <option>Cella n.1 (Verdure/Pesce)</option>
-      <option>Frigo Colonna A (Dolci)</option>
-      <option>Frigo Colonna B (Latticini/Pasta)</option>
-      <option>Cella Surgelati 1 (Cantina)</option>
-      <option>Cella Surgelati 2 (Cantina)</option>
-      <option>Altro</option>
-    </select>
-    <label>Temperatura (°C)</label>
-    <input type="number" id="tVal" placeholder="es. 3.5" step="0.1">
-    <label>Ora rilevazione</label>
-    <input type="time" id="tOra">
+    <div class="card-t">📋 Registro ASL — Giornaliero</div>
+    <div id="regOggiStatus" style="font-size:0.75rem;margin-bottom:10px;padding:8px;border-radius:8px;background:rgba(14,124,123,0.1);color:var(--teal-l)">Verifica registrazione di oggi...</div>
     <label>Operatore</label>
-    <select id="tOp" onchange="checkOtherOp('tOp','tOpAlt')">
+    <select id="rgOp" onchange="checkOtherOp('rgOp','rgOpAlt')">
       <option value="">— Seleziona —</option>
     </select>
-    <input type="text" id="tOpAlt" placeholder="Nome operatore" style="display:none;margin-top:8px">
+    <input type="text" id="rgOpAlt" placeholder="Nome operatore" style="display:none;margin-top:8px">
     <label>Note (opzionale)</label>
-    <textarea id="tNote" placeholder="es. porta aperta per carico merce..."></textarea>
-    <button class="btn btn-g" onclick="saveTemp()">💾 Registra</button>
+    <input type="text" id="rgNote" placeholder="es. tutto nella norma...">
+    <button class="btn btn-g" id="btnRegOggi" onclick="saveRegGiornaliera()">✅ Registra lettura di oggi</button>
   </div>
 
+  <!-- STORICO ASL -->
   <div class="card">
-    <div class="card-t">📊 Ultime registrazioni</div>
-    <div id="tempLogs"><div class="empty"><div class="empty-icon">🌡️</div><div class="empty-text">Nessuna registrazione</div></div></div>
+    <div class="card-t">📊 Storico Registro ASL</div>
+    <div id="storicoGiornaliero"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Nessuna registrazione</div></div></div>
   </div>
 </section>
 
@@ -966,7 +902,7 @@ function getOp(selId,altId){
 
 function populateOpSelects(){
   const ops=ls('ops');
-  const selIds=['tOp','cOp','lOp','lbOp','qOp','batchOp','pulGOp','pulSOp','pulMOp'];
+  const selIds=['tOp','cOp','lOp','lbOp','qOp','batchOp','pulGOp','pulSOp','pulMOp','rgOp'];
   selIds.forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel)return;
@@ -996,7 +932,7 @@ function show(id,btn){
   if(btn) btn.classList.add('on');
   if(id==='home') renderHome();
   if(id==='scad') renderScadenze();
-  if(id==='temp'){document.getElementById('tOra').value=nowTime(); loadLiveCelle();}
+  if(id==='temp'){document.getElementById('tOra').value=nowTime(); loadLiveCelle(); clearInterval(window._celleTimer); window._celleTimer=setInterval(loadLiveCelle,5*60*1000);}
   if(id==='label') renderProducts('Tutti');
 }
 
@@ -1044,6 +980,88 @@ function renderHome(){
 // TEMPERATURE
 // ═══════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════
+// REGISTRAZIONE GIORNALIERA CELLE (ASL)
+// ═══════════════════════════════════════════════════════
+let _celleSnapshot = [];
+
+function checkRegOggi(){
+  const storico = ls('regGiornaliera')||[];
+  const oggi = today();
+  const giaFatta = storico.find(r => r.date === oggi);
+  const status = document.getElementById('regOggiStatus');
+  const btn = document.getElementById('btnRegOggi');
+  if(giaFatta){
+    status.style.background = 'rgba(76,175,130,0.15)';
+    status.style.color = 'var(--success)';
+    status.textContent = `✅ Oggi (${oggi}) già registrato alle ${giaFatta.ora} da ${giaFatta.operatore}`;
+    btn.textContent = '🔄 Registra di nuovo (sovrascrive)';
+  } else {
+    status.style.background = 'rgba(201,168,76,0.15)';
+    status.style.color = 'var(--gold)';
+    status.textContent = `⚠️ Oggi (${oggi}) non ancora registrato`;
+    btn.textContent = '✅ Registra lettura di oggi';
+  }
+}
+
+async function saveRegGiornaliera(){
+  if(!_celleSnapshot.length){ alert('Attendi il caricamento delle temperature dai sensori'); return; }
+  const op = getOp('rgOp','rgOpAlt');
+  if(!op){ alert('Seleziona operatore'); return; }
+  const noteGen = document.getElementById('rgNote').value;
+  const record = {
+    id: uid(),
+    date: today(),
+    ora: nowTime(),
+    operatore: op,
+    note: noteGen,
+    celle: _celleSnapshot.map(c=>({ zona:c.zona, temp:c.temp, min:c.min, max:c.max, status:c.status })),
+    source: 'giornaliero-auto',
+  };
+  const storico = ls('regGiornaliera')||[];
+  const idx = storico.findIndex(r => r.date === today());
+  if(idx>=0) storico[idx] = record; else storico.unshift(record);
+  lss('regGiornaliera', storico);
+  try {
+    const fdb = firestoreDb || firebase.firestore();
+    await fdb.collection('reg_giornaliera').doc(record.date).set({
+      ...record, timestamp: firebase.firestore.Timestamp.now(),
+    });
+  } catch(e){ console.warn('Firebase:', e); }
+  addActivity(`📋 Reg. giornaliera celle — ${op}`);
+  document.getElementById('rgNote').value='';
+  checkRegOggi();
+  renderStoricoGiornaliero();
+  alert('✅ Registrazione salvata!');
+}
+
+function renderStoricoGiornaliero(){
+  const storico = ls('regGiornaliera')||[];
+  const box = document.getElementById('storicoGiornaliero');
+  if(!storico.length){ box.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Nessuna registrazione</div></div>'; return; }
+  box.innerHTML = storico.slice(0,15).map(r => {
+    const anomalie = (r.celle||[]).filter(c=>c.status==='anomalia').length;
+    return `<div class="${anomalie>0?'li li-danger':'li li-l'}" style="flex-direction:column;align-items:flex-start;gap:4px">
+      <div style="display:flex;justify-content:space-between;width:100%">
+        <div style="font-size:0.82rem;font-weight:600">${r.date} ore ${r.ora}</div>
+        ${anomalie>0?`<span class="badge b-r">${anomalie} anomalie</span>`:'<span class="badge b-g">OK</span>'}
+      </div>
+      <div class="li-meta">${r.operatore}${r.note?' — '+r.note:''}</div>
+      <div style="width:100%;margin-top:4px">
+        ${['Cantina','Cucina'].map(g => {
+          const cc = (r.celle||[]).filter(c=>(c.zona_gruppo||'Cucina')===g);
+          if(!cc.length) return '';
+          return `<div style="font-size:0.62rem;color:var(--muted);font-weight:700;margin-top:4px;text-transform:uppercase">${g}</div>`+
+            cc.map(c=>`<div style="display:flex;justify-content:space-between;font-size:0.7rem;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+              <span style="color:var(--muted)">${c.zona}</span>
+              <span style="color:${c.status==='anomalia'?'var(--danger)':c.status==='no_sensor'?'var(--muted)':'var(--teal-l)'};font-weight:600">${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'—'}</span>
+            </div>`).join('');
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
 // LIVE CELLE DA FIREBASE
 // ═══════════════════════════════════════════════════════
 async function loadLiveCelle(){
@@ -1056,19 +1074,37 @@ async function loadLiveCelle(){
     const celle = [];
     snap.forEach(doc => celle.push(doc.data()));
     celle.sort((a,b) => a.zona.localeCompare(b.zona));
-    box.innerHTML = celle.map(c => {
-      const cls = c.status === 'anomalia' ? 'li li-danger' : c.status === 'offline' ? 'li li-warn' : 'li li-l';
-      const icon = c.status === 'anomalia' ? '🚨' : c.status === 'offline' ? '⚠️' : '✅';
-      const ts = c.timestamp ? new Date(c.timestamp.seconds*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '--:--';
-      return `<div class="${cls}">
-        <div>
-          <div style="font-size:0.82rem;font-weight:600">${icon} ${c.zona}</div>
-          <div class="li-meta">Range: ${c.min}°C / ${c.max}°C · ore ${ts}</div>
-        </div>
-        <div class="li-val">${c.temp !== undefined ? c.temp+'°C' : 'N/D'}</div>
-      </div>`;
-    }).join('');
+    const gruppi = {};
+    celle.forEach(c => {
+      const g = c.zona_gruppo || 'Altro';
+      if(!gruppi[g]) gruppi[g] = [];
+      gruppi[g].push(c);
+    });
+    const ordineGruppi = ['Cantina','Cucina','Altro'];
+    const iconeGruppi = {'Cantina':'🏚️','Cucina':'🍳','Altro':'📦'};
+    let html = '';
+    ordineGruppi.forEach(g => {
+      if(!gruppi[g]) return;
+      html += `<div style="font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px">${iconeGruppi[g]||'📦'} ${g}</div>`;
+      gruppi[g].forEach(c => {
+        const cls = c.status==='anomalia' ? 'li li-danger' : c.status==='offline' ? 'li li-warn' : c.status==='no_sensor' ? 'li' : 'li li-l';
+        const icon = c.status==='anomalia' ? '🚨' : c.status==='offline' ? '⚠️' : c.status==='no_sensor' ? '🔲' : '✅';
+        const ts = c.timestamp ? new Date(c.timestamp.seconds*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '--:--';
+        const tempLabel = c.status==='no_sensor' ? '<span style="font-size:0.65rem;color:var(--muted)">In attesa sensore</span>' : `<div class="li-val">${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'N/D'}</div>`;
+        html += `<div class="${cls}">
+          <div>
+            <div style="font-size:0.82rem;font-weight:600">${icon} ${c.zona}</div>
+            <div class="li-meta">Range: ${c.min}°C / ${c.max}°C${c.status!=='no_sensor'?' · ore '+ts:''}</div>
+          </div>
+          ${tempLabel}
+        </div>`;
+      });
+    });
+    box.innerHTML = html;
     agg.textContent = 'Aggiornato ' + new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    _celleSnapshot = celle;
+    checkRegOggi();
+    renderStoricoGiornaliero();
   } catch(e) {
     box.innerHTML = `<div style="font-size:0.78rem;color:var(--danger);padding:8px">Errore: ${e.message||e}</div>`;
     console.error(e);
