@@ -931,6 +931,7 @@ function show(id,btn){
   document.getElementById(id).classList.add('on');
   if(btn) btn.classList.add('on');
   if(id==='home') renderHome();
+  if(id==='lotti') renderLottiLogs();
   if(id==='scad') renderScadenze();
   if(id==='temp'){document.getElementById('tOra').value=nowTime(); loadLiveCelle(); clearInterval(window._celleTimer); window._celleTimer=setInterval(loadLiveCelle,5*60*1000);}
   if(id==='label') renderProducts('Tutti');
@@ -984,12 +985,16 @@ function renderHome(){
 // ═══════════════════════════════════════════════════════
 let _celleSnapshot = [];
 
-function checkRegOggi(){
-  const storico = ls('regGiornaliera')||[];
+async function checkRegOggi(){
   const oggi = today();
-  const giaFatta = storico.find(r => r.date === oggi);
   const status = document.getElementById('regOggiStatus');
   const btn = document.getElementById('btnRegOggi');
+  let giaFatta = null;
+  try {
+    const fdb = firestoreDb || firebase.firestore();
+    const doc = await fdb.collection('reg_giornaliera').doc(oggi).get();
+    if(doc.exists) giaFatta = doc.data();
+  } catch(e){ console.warn('checkRegOggi Firebase:', e); }
   if(giaFatta){
     status.style.background = 'rgba(76,175,130,0.15)';
     status.style.color = 'var(--success)';
@@ -1017,16 +1022,10 @@ async function saveRegGiornaliera(){
     celle: _celleSnapshot.map(c=>({ zona:c.zona, temp:c.temp, min:c.min, max:c.max, status:c.status })),
     source: 'giornaliero-auto',
   };
-  const storico = ls('regGiornaliera')||[];
-  const idx = storico.findIndex(r => r.date === today());
-  if(idx>=0) storico[idx] = record; else storico.unshift(record);
-  lss('regGiornaliera', storico);
-  try {
-    const fdb = firestoreDb || firebase.firestore();
-    await fdb.collection('reg_giornaliera').doc(record.date).set({
-      ...record, timestamp: firebase.firestore.Timestamp.now(),
-    });
-  } catch(e){ console.warn('Firebase:', e); }
+  const fdb = firestoreDb || firebase.firestore();
+  await fdb.collection('reg_giornaliera').doc(record.date).set({
+    ...record, timestamp: firebase.firestore.Timestamp.now(),
+  });
   addActivity(`📋 Reg. giornaliera celle — ${op}`);
   document.getElementById('rgNote').value='';
   checkRegOggi();
@@ -1034,9 +1033,19 @@ async function saveRegGiornaliera(){
   alert('✅ Registrazione salvata!');
 }
 
-function renderStoricoGiornaliero(){
-  const storico = ls('regGiornaliera')||[];
+async function renderStoricoGiornaliero(){
   const box = document.getElementById('storicoGiornaliero');
+  box.innerHTML='<div style="font-size:0.78rem;color:var(--muted);padding:8px">Caricamento...</div>';
+  let storico = [];
+  try {
+    const fdb = firestoreDb || firebase.firestore();
+    const snap = await fdb.collection('reg_giornaliera').orderBy('date','desc').limit(15).get();
+    snap.forEach(doc => storico.push(doc.data()));
+  } catch(e){
+    // fallback localStorage
+    storico = ls('regGiornaliera')||[];
+    console.warn('Firebase storico fallback:', e);
+  }
   if(!storico.length){ box.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Nessuna registrazione</div></div>'; return; }
   box.innerHTML = storico.slice(0,15).map(r => {
     const anomalie = (r.celle||[]).filter(c=>c.status==='anomalia').length;
@@ -2963,10 +2972,11 @@ function showBackupMsg(msg, type){
 
 function initApp(){
   // Set default dates/times
-  document.getElementById('lbDataProd').value=today();
-  document.getElementById('sProd_data').value=today();
-  document.getElementById('lData').value=today();
-  document.getElementById('tOra').value=nowTime();
+  const _s = (id,v) => { const el=document.getElementById(id); if(el) el.value=v; };
+  _s('lbDataProd', today());
+  _s('sProd_data', today());
+  _s('lData', today());
+  _s('tOra', nowTime());
 
   // Render category filter
   renderCatFilter();
