@@ -11,6 +11,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script src="firebase-config.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -245,6 +246,13 @@ textarea{resize:vertical;min-height:65px}
       <div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Connessione in corso...</div></div>
     </div>
     <button class="btn btn-o" style="margin-top:10px;font-size:0.75rem;padding:8px" onclick="loadLiveCelle()">🔄 Aggiorna</button>
+  </div>
+
+  <!-- NOTIFICHE PUSH ALLARME -->
+  <div class="card">
+    <div class="card-t">🔔 Notifiche di allarme</div>
+    <div id="pushStatus" style="font-size:0.75rem;margin-bottom:10px;padding:8px;border-radius:8px;background:rgba(14,124,123,0.1);color:var(--teal-l)">Ricevi una notifica sul telefono se una cella resta fuori soglia per più di un'ora.</div>
+    <button class="btn btn-g" id="btnPushEnable" onclick="enablePushNotifications()">🔔 Attiva notifiche su questo telefono</button>
   </div>
 
   <!-- REGISTRAZIONE ASL GIORNALIERA -->
@@ -1073,6 +1081,50 @@ async function renderStoricoGiornaliero(){
 // ═══════════════════════════════════════════════════════
 // LIVE CELLE DA FIREBASE
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// NOTIFICHE PUSH ALLARME CELLE (Firebase Cloud Messaging)
+// ═══════════════════════════════════════════════════════
+// IMPORTANTE: sostituire con la VAPID key generata da
+// Firebase Console → Impostazioni progetto → Cloud Messaging → Web configuration
+const FCM_VAPID_KEY = 'INSERISCI_QUI_LA_VAPID_KEY';
+
+async function enablePushNotifications(){
+  const status = document.getElementById('pushStatus');
+  const btn = document.getElementById('btnPushEnable');
+  if(!('serviceWorker' in navigator) || !('Notification' in window)){
+    status.style.background='rgba(224,92,92,0.15)'; status.style.color='var(--danger)';
+    status.textContent='⚠️ Questo browser non supporta le notifiche push.';
+    return;
+  }
+  try{
+    btn.disabled = true; btn.textContent='Attivazione in corso...';
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){
+      status.style.background='rgba(224,92,92,0.15)'; status.style.color='var(--danger)';
+      status.textContent='⚠️ Permesso negato. Abilita le notifiche nelle impostazioni del browser per questo sito.';
+      btn.disabled=false; btn.textContent='🔔 Attiva notifiche su questo telefono';
+      return;
+    }
+    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg });
+    if(!token) throw new Error('Token non generato');
+    const fdb = firestoreDb || firebase.firestore();
+    await fdb.collection('fcm_tokens').doc(token).set({
+      token, createdAt: firebase.firestore.Timestamp.now(),
+      userAgent: navigator.userAgent, role: sessionStorage.getItem('role')||'', name: sessionStorage.getItem('userName')||''
+    });
+    status.style.background='rgba(76,175,130,0.15)'; status.style.color='var(--success)';
+    status.textContent='✅ Notifiche attivate su questo telefono. Riceverai un avviso se una cella resta fuori soglia per più di un\'ora.';
+    btn.textContent='✅ Notifiche attive'; btn.disabled=true;
+  }catch(e){
+    console.error('Push setup error:', e);
+    status.style.background='rgba(224,92,92,0.15)'; status.style.color='var(--danger)';
+    status.textContent='⚠️ Errore attivazione: '+(e.message||e);
+    btn.disabled=false; btn.textContent='🔔 Attiva notifiche su questo telefono';
+  }
+}
+
 async function loadLiveCelle(){
   const box = document.getElementById('liveCelleList');
   const agg = document.getElementById('liveCelleAgg');
