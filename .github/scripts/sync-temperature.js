@@ -56,10 +56,19 @@ async function sendPushAlert(zona, temp, min, max) {
   if (tokensSnap.empty) { console.log('Nessun dispositivo registrato per le notifiche push'); return; }
 
   const tokens = tokensSnap.docs.map(d => d.id);
+  const title = '🚨 Allarme Cella HACCP';
+  const body  = `${zona}: ${temp}°C (range ${min}/${max}°C) da oltre 1 ora`;
   const message = {
-    notification: {
-      title: '🚨 Allarme Cella HACCP',
-      body: `${zona}: ${temp}°C (range ${min}/${max}°C) da oltre 1 ora`,
+    notification: { title, body },
+    webpush: {
+      headers: { Urgency: 'high', TTL: '86400' },
+      notification: {
+        title, body,
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 200],
+        tag: 'haccp-cella-alert',
+        renotify: true,
+      },
     },
     tokens,
   };

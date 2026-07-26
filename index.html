@@ -1088,6 +1088,28 @@ async function renderStoricoGiornaliero(){
 // Firebase Console → Impostazioni progetto → Cloud Messaging → Web configuration
 const FCM_VAPID_KEY = 'BNjCovajmwLw9v_R9JCi1yY8SFPWlJ1Ul-8GHfBWDT0OKyrCsFsQGUW7wu_6djpo1vrSmYlhl19BPG057nEUexw';
 
+// Riaggancia il listener foreground se il permesso è già stato concesso in passato
+async function reattachPushListener(){
+  try{
+    if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
+    if(Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    const messaging = firebase.messaging();
+    messaging.onMessage(payload => {
+      const t = payload.notification?.title || '🚨 Allarme Cella HACCP';
+      const b = payload.notification?.body || 'Una cella è fuori soglia';
+      reg.showNotification(t, { body: b, vibrate:[200,100,200,100,200], requireInteraction:true, silent:false, tag:'haccp-cella-alert', renotify:true });
+    });
+    const status = document.getElementById('pushStatus');
+    const btn = document.getElementById('btnPushEnable');
+    if(status && btn){
+      status.style.background='rgba(76,175,130,0.15)'; status.style.color='var(--success)';
+      status.textContent='✅ Notifiche attive su questo telefono.';
+      btn.textContent='✅ Notifiche attive'; btn.disabled=true;
+    }
+  }catch(e){ console.warn('reattachPushListener:', e); }
+}
+
 async function enablePushNotifications(){
   const status = document.getElementById('pushStatus');
   const btn = document.getElementById('btnPushEnable');
@@ -1113,6 +1135,12 @@ async function enablePushNotifications(){
     await fdb.collection('fcm_tokens').doc(token).set({
       token, createdAt: firebase.firestore.Timestamp.now(),
       userAgent: navigator.userAgent, role: sessionStorage.getItem('role')||'', name: sessionStorage.getItem('userName')||''
+    });
+    // Notifiche ricevute mentre l'app è aperta in primo piano
+    messaging.onMessage(payload => {
+      const t = payload.notification?.title || '🚨 Allarme Cella HACCP';
+      const b = payload.notification?.body || 'Una cella è fuori soglia';
+      reg.showNotification(t, { body: b, vibrate:[200,100,200,100,200], requireInteraction:true, silent:false, tag:'haccp-cella-alert', renotify:true });
     });
     status.style.background='rgba(76,175,130,0.15)'; status.style.color='var(--success)';
     status.textContent='✅ Notifiche attivate su questo telefono. Riceverai un avviso se una cella resta fuori soglia per più di un\'ora.';
@@ -3046,6 +3074,7 @@ function initApp(){
   renderPulizieLog('giornaliera');
   renderHome();
   eliminaScaduteAuto();
+  reattachPushListener();
 }
 
 // Elimina automaticamente le scadenze con data passata
