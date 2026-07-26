@@ -18,7 +18,9 @@ messaging.onBackgroundMessage((payload) => {
     body: payload.notification?.body || 'Una cella è fuori soglia',
     vibrate: [200, 100, 200, 100, 200],
     requireInteraction: true,
+    silent: false,
     tag: 'haccp-cella-alert',
+    renotify: true, // ri-suona anche se una notifica dello stesso tipo è già presente
   };
   self.registration.showNotification(title, options);
 });
