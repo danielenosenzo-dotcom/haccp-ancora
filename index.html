@@ -191,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v9.3</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v9.4</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1110,6 +1110,24 @@ function setPushCard(stato, testo, bloccaBtn){
   btn.textContent = bloccaBtn ? '✅ Notifiche attive' : '🔔 Attiva notifiche su questo telefono';
 }
 
+// Scrive su Firestore lo stato diagnostico delle notifiche, per capire da remoto
+// perché su un dato dispositivo l'attivazione non viene ricordata
+async function logPushDiag(fase, extra){
+  try{
+    const fdb = firestoreDb || firebase.firestore();
+    await fdb.collection('push_diag').doc('ultimo').set({
+      fase,
+      permission: (typeof Notification!=='undefined') ? Notification.permission : 'n/d',
+      swSupport: ('serviceWorker' in navigator),
+      standalone: window.matchMedia && window.matchMedia('(display-mode: standalone)').matches,
+      ua: navigator.userAgent,
+      url: location.href,
+      ts: firebase.firestore.Timestamp.now(),
+      ...(extra||{})
+    });
+  }catch(e){ console.warn('logPushDiag:', e); }
+}
+
 // Verifica lo stato REALE delle notifiche: non basta il permesso del browser,
 // serve una sottoscrizione push viva — è quella che determina se l'allarme arriverà.
 async function reattachPushListener(){
@@ -1119,10 +1137,12 @@ async function reattachPushListener(){
   }
   if(Notification.permission === 'denied'){
     setPushCard('err', '⚠️ Notifiche bloccate per questo sito. Sbloccale dalle impostazioni del browser.', false);
+    logPushDiag('permesso-negato');
     return;
   }
   if(Notification.permission !== 'granted'){
     setPushCard('warn', '🔔 Notifiche non ancora attive su questo telefono. Tocca il pulsante per attivarle.', false);
+    logPushDiag('permesso-non-memorizzato');
     return;
   }
 
@@ -1142,10 +1162,12 @@ async function reattachPushListener(){
     if(!sub){
       // Permesso concesso ma sottoscrizione persa: le notifiche NON arriverebbero
       setPushCard('warn', '⚠️ Iscrizione alle notifiche persa. Tocca il pulsante per ripristinarla.', false);
+      logPushDiag('sottoscrizione-assente', { swState: reg.active ? reg.active.state : 'nessuno' });
       return;
     }
 
     setPushCard('ok', '✅ Notifiche attive su questo telefono.', true);
+    logPushDiag('ok-attive', { endpoint: (sub.endpoint||'').substring(0,60) });
 
     if(_pushListenerAttached) return;
     const messaging = firebase.messaging();
@@ -1158,6 +1180,7 @@ async function reattachPushListener(){
   }catch(e){
     console.warn('reattachPushListener:', e);
     setPushCard('warn', '⚠️ Stato notifiche non verificabile. Tocca il pulsante per riattivarle.', false);
+    logPushDiag('errore-verifica', { errore: String(e && e.message || e) });
   }finally{
     _pushCheckInFlight = false;
   }
