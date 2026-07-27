@@ -941,7 +941,7 @@ function show(id,btn){
   if(id==='home') renderHome();
   if(id==='lotti') renderLottiLogs();
   if(id==='scad') renderScadenze();
-  if(id==='temp'){document.getElementById('tOra').value=nowTime(); loadLiveCelle(); clearInterval(window._celleTimer); window._celleTimer=setInterval(loadLiveCelle,5*60*1000);}
+  if(id==='temp'){document.getElementById('tOra').value=nowTime(); loadLiveCelle(); reattachPushListener(); clearInterval(window._celleTimer); window._celleTimer=setInterval(loadLiveCelle,5*60*1000);}
   if(id==='label') renderProducts('Tutti');
 }
 
@@ -1089,10 +1089,23 @@ async function renderStoricoGiornaliero(){
 const FCM_VAPID_KEY = 'BNjCovajmwLw9v_R9JCi1yY8SFPWlJ1Ul-8GHfBWDT0OKyrCsFsQGUW7wu_6djpo1vrSmYlhl19BPG057nEUexw';
 
 // Riaggancia il listener foreground se il permesso è già stato concesso in passato
+let _pushListenerAttached = false;
+
 async function reattachPushListener(){
+  if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
+  if(Notification.permission !== 'granted') return;
+
+  // Aggiorna subito la UI: il permesso c'è già, non serve attendere il service worker
+  const status = document.getElementById('pushStatus');
+  const btn = document.getElementById('btnPushEnable');
+  if(status && btn){
+    status.style.background='rgba(76,175,130,0.15)'; status.style.color='var(--success)';
+    status.textContent='✅ Notifiche attive su questo telefono.';
+    btn.textContent='✅ Notifiche attive'; btn.disabled=true;
+  }
+
+  if(_pushListenerAttached) return;
   try{
-    if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
-    if(Notification.permission !== 'granted') return;
     const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
     const messaging = firebase.messaging();
     messaging.onMessage(payload => {
@@ -1100,13 +1113,7 @@ async function reattachPushListener(){
       const b = payload.notification?.body || 'Una cella è fuori soglia';
       reg.showNotification(t, { body: b, vibrate:[200,100,200,100,200], requireInteraction:true, silent:false, tag:'haccp-cella-alert', renotify:true });
     });
-    const status = document.getElementById('pushStatus');
-    const btn = document.getElementById('btnPushEnable');
-    if(status && btn){
-      status.style.background='rgba(76,175,130,0.15)'; status.style.color='var(--success)';
-      status.textContent='✅ Notifiche attive su questo telefono.';
-      btn.textContent='✅ Notifiche attive'; btn.disabled=true;
-    }
+    _pushListenerAttached = true;
   }catch(e){ console.warn('reattachPushListener:', e); }
 }
 
@@ -1156,6 +1163,7 @@ async function enablePushNotifications(){
 async function loadLiveCelle(){
   const box = document.getElementById('liveCelleList');
   const agg = document.getElementById('liveCelleAgg');
+  reattachPushListener();
   try {
     const fdb = firestoreDb || firebase.firestore();
     const snap = await fdb.collection('celle_live').get();
