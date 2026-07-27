@@ -191,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v9.2</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v9.3</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1092,6 +1092,7 @@ async function renderStoricoGiornaliero(){
 const FCM_VAPID_KEY = 'BNjCovajmwLw9v_R9JCi1yY8SFPWlJ1Ul-8GHfBWDT0OKyrCsFsQGUW7wu_6djpo1vrSmYlhl19BPG057nEUexw';
 
 let _pushListenerAttached = false;
+let _pushCheckInFlight = false;
 
 function setPushCard(stato, testo, bloccaBtn){
   const status = document.getElementById('pushStatus');
@@ -1125,8 +1126,17 @@ async function reattachPushListener(){
     return;
   }
 
+  // Il permesso c'è: mostra subito uno stato di verifica, così non compare
+  // il pulsante "Attiva" mentre il service worker si sta avviando
+  setPushCard('ok', '⏳ Verifica notifiche in corso...', true);
+
+  if(_pushCheckInFlight) return;
+  _pushCheckInFlight = true;
   try{
-    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    // Attendere che il service worker sia ATTIVO: prima di allora getSubscription()
+    // può restituire null anche se la sottoscrizione esiste davvero
+    const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
 
     if(!sub){
@@ -1148,6 +1158,8 @@ async function reattachPushListener(){
   }catch(e){
     console.warn('reattachPushListener:', e);
     setPushCard('warn', '⚠️ Stato notifiche non verificabile. Tocca il pulsante per riattivarle.', false);
+  }finally{
+    _pushCheckInFlight = false;
   }
 }
 
