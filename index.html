@@ -191,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v9.4</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v9.5</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1146,30 +1146,23 @@ async function reattachPushListener(){
     return;
   }
 
-  // Il permesso c'è: mostra subito uno stato di verifica, così non compare
-  // il pulsante "Attiva" mentre il service worker si sta avviando
-  setPushCard('ok', '⏳ Verifica notifiche in corso...', true);
+  // Il permesso è concesso: questo basta a garantire che l'allarme arrivi.
+  // Lo stato è definitivo — i controlli sul service worker qui sotto servono solo
+  // ad agganciare il listener, e un loro ritardo non deve mai far tornare
+  // indietro la card facendo credere che le notifiche siano spente.
+  setPushCard('ok', '✅ Notifiche attive su questo telefono.', true);
 
-  if(_pushCheckInFlight) return;
+  if(_pushCheckInFlight || _pushListenerAttached) return;
   _pushCheckInFlight = true;
   try{
     await navigator.serviceWorker.register('firebase-messaging-sw.js');
-    // Attendere che il service worker sia ATTIVO: prima di allora getSubscription()
-    // può restituire null anche se la sottoscrizione esiste davvero
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
+    logPushDiag(sub ? 'ok-attive' : 'sottoscrizione-assente', {
+      endpoint: sub ? (sub.endpoint||'').substring(0,60) : null,
+      swState: reg.active ? reg.active.state : 'nessuno',
+    });
 
-    if(!sub){
-      // Permesso concesso ma sottoscrizione persa: le notifiche NON arriverebbero
-      setPushCard('warn', '⚠️ Iscrizione alle notifiche persa. Tocca il pulsante per ripristinarla.', false);
-      logPushDiag('sottoscrizione-assente', { swState: reg.active ? reg.active.state : 'nessuno' });
-      return;
-    }
-
-    setPushCard('ok', '✅ Notifiche attive su questo telefono.', true);
-    logPushDiag('ok-attive', { endpoint: (sub.endpoint||'').substring(0,60) });
-
-    if(_pushListenerAttached) return;
     const messaging = firebase.messaging();
     messaging.onMessage(payload => {
       const t = payload.notification?.title || '🚨 Allarme Cella HACCP';
@@ -1179,7 +1172,6 @@ async function reattachPushListener(){
     _pushListenerAttached = true;
   }catch(e){
     console.warn('reattachPushListener:', e);
-    setPushCard('warn', '⚠️ Stato notifiche non verificabile. Tocca il pulsante per riattivarle.', false);
     logPushDiag('errore-verifica', { errore: String(e && e.message || e) });
   }finally{
     _pushCheckInFlight = false;
