@@ -1093,7 +1093,15 @@ let _pushListenerAttached = false;
 
 async function reattachPushListener(){
   if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
-  if(Notification.permission !== 'granted') return;
+  if(Notification.permission !== 'granted'){
+    // Diagnostica visibile: mostra perché la card non risulta attiva
+    const st = document.getElementById('pushStatus');
+    if(st){
+      st.style.background='rgba(201,168,76,0.15)'; st.style.color='var(--gold)';
+      st.textContent='⚠️ Permesso notifiche non memorizzato (stato: '+Notification.permission+'). Se sei in navigazione privata o Firefox lo azzera alla chiusura, va riattivato ogni volta.';
+    }
+    return;
+  }
 
   // Aggiorna subito la UI: il permesso c'è già, non serve attendere il service worker
   const status = document.getElementById('pushStatus');
