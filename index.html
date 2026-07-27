@@ -7,6 +7,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="L'Ancora HACCP">
 <title>L'Ancora — HACCP & Etichette</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -188,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v9.1</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v9.2</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1088,33 +1091,53 @@ async function renderStoricoGiornaliero(){
 // Firebase Console → Impostazioni progetto → Cloud Messaging → Web configuration
 const FCM_VAPID_KEY = 'BNjCovajmwLw9v_R9JCi1yY8SFPWlJ1Ul-8GHfBWDT0OKyrCsFsQGUW7wu_6djpo1vrSmYlhl19BPG057nEUexw';
 
-// Riaggancia il listener foreground se il permesso è già stato concesso in passato
 let _pushListenerAttached = false;
 
+function setPushCard(stato, testo, bloccaBtn){
+  const status = document.getElementById('pushStatus');
+  const btn = document.getElementById('btnPushEnable');
+  if(!status || !btn) return;
+  const colori = {
+    ok:    ['rgba(76,175,130,0.15)',  'var(--success)'],
+    warn:  ['rgba(201,168,76,0.15)',  'var(--gold)'],
+    err:   ['rgba(224,92,92,0.15)',   'var(--danger)'],
+  };
+  const [bg, fg] = colori[stato] || colori.warn;
+  status.style.background = bg; status.style.color = fg;
+  status.textContent = testo;
+  btn.disabled = !!bloccaBtn;
+  btn.textContent = bloccaBtn ? '✅ Notifiche attive' : '🔔 Attiva notifiche su questo telefono';
+}
+
+// Verifica lo stato REALE delle notifiche: non basta il permesso del browser,
+// serve una sottoscrizione push viva — è quella che determina se l'allarme arriverà.
 async function reattachPushListener(){
-  if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
+  if(!('serviceWorker' in navigator) || !('Notification' in window)){
+    setPushCard('err', '⚠️ Questo browser non supporta le notifiche push.', false);
+    return;
+  }
+  if(Notification.permission === 'denied'){
+    setPushCard('err', '⚠️ Notifiche bloccate per questo sito. Sbloccale dalle impostazioni del browser.', false);
+    return;
+  }
   if(Notification.permission !== 'granted'){
-    // Diagnostica visibile: mostra perché la card non risulta attiva
-    const st = document.getElementById('pushStatus');
-    if(st){
-      st.style.background='rgba(201,168,76,0.15)'; st.style.color='var(--gold)';
-      st.textContent='⚠️ Permesso notifiche non memorizzato (stato: '+Notification.permission+'). Se sei in navigazione privata o Firefox lo azzera alla chiusura, va riattivato ogni volta.';
-    }
+    setPushCard('warn', '🔔 Notifiche non ancora attive su questo telefono. Tocca il pulsante per attivarle.', false);
     return;
   }
 
-  // Aggiorna subito la UI: il permesso c'è già, non serve attendere il service worker
-  const status = document.getElementById('pushStatus');
-  const btn = document.getElementById('btnPushEnable');
-  if(status && btn){
-    status.style.background='rgba(76,175,130,0.15)'; status.style.color='var(--success)';
-    status.textContent='✅ Notifiche attive su questo telefono.';
-    btn.textContent='✅ Notifiche attive'; btn.disabled=true;
-  }
-
-  if(_pushListenerAttached) return;
   try{
     const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    const sub = await reg.pushManager.getSubscription();
+
+    if(!sub){
+      // Permesso concesso ma sottoscrizione persa: le notifiche NON arriverebbero
+      setPushCard('warn', '⚠️ Iscrizione alle notifiche persa. Tocca il pulsante per ripristinarla.', false);
+      return;
+    }
+
+    setPushCard('ok', '✅ Notifiche attive su questo telefono.', true);
+
+    if(_pushListenerAttached) return;
     const messaging = firebase.messaging();
     messaging.onMessage(payload => {
       const t = payload.notification?.title || '🚨 Allarme Cella HACCP';
@@ -1122,7 +1145,10 @@ async function reattachPushListener(){
       reg.showNotification(t, { body: b, vibrate:[200,100,200,100,200], requireInteraction:true, silent:false, tag:'haccp-cella-alert', renotify:true });
     });
     _pushListenerAttached = true;
-  }catch(e){ console.warn('reattachPushListener:', e); }
+  }catch(e){
+    console.warn('reattachPushListener:', e);
+    setPushCard('warn', '⚠️ Stato notifiche non verificabile. Tocca il pulsante per riattivarle.', false);
+  }
 }
 
 async function enablePushNotifications(){
