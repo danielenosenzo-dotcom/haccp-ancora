@@ -191,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v9.5</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v9.6</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -943,7 +943,7 @@ function show(id,btn){
   if(btn) btn.classList.add('on');
   if(id==='home') renderHome();
   if(id==='lotti') renderLottiLogs();
-  if(id==='scad') renderScadenze();
+  if(id==='scad'){ eliminaScaduteAuto(); renderScadenze(); }
   if(id==='temp'){document.getElementById('tOra').value=nowTime(); loadLiveCelle(); reattachPushListener(); clearInterval(window._celleTimer); window._celleTimer=setInterval(loadLiveCelle,5*60*1000);}
   if(id==='label') renderProducts('Tutti');
 }
