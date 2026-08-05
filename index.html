@@ -191,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v9.7</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v9.8</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3108,8 +3108,31 @@ function showBackupMsg(msg, type){
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
+// Cattura il code OAuth di eWeLink al ritorno dall'autorizzazione.
+// Dura pochi secondi: passarlo a mano non fa in tempo, quindi lo depositiamo
+// subito su Firestore dove lo scambio avviene lato server (il secret non sta qui).
+function catturaCodeOAuth(){
+  try{
+    const p = new URLSearchParams(location.search);
+    const code = p.get('code');
+    if(!code) return;
+    firebase.firestore().collection('config').doc('oauth_code').set({
+      code, region: p.get('region')||'', state: p.get('state')||'',
+      ricevutoIl: firebase.firestore.Timestamp.now(), usato: false,
+    }).then(()=>{
+      const b=document.createElement('div');
+      b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#4caf82;color:#fff;padding:12px;font:600 0.85rem sans-serif;text-align:center';
+      b.textContent='✅ Autorizzazione eWeLink ricevuta — riconnessione in corso';
+      document.body.appendChild(b);
+      setTimeout(()=>b.remove(), 8000);
+    }).catch(e=>console.error('Cattura code fallita:', e));
+    history.replaceState({}, '', location.pathname);
+  }catch(e){ console.warn('catturaCodeOAuth:', e); }
+}
+
 (function init(){
   firebase.initializeApp(firebaseConfig);
+  catturaCodeOAuth();
   initFirestore(startApp);
 })();
 
