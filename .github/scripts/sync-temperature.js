@@ -1,10 +1,13 @@
 const { createHmac } = require('crypto');
 const admin = require('firebase-admin');
 
+// Nomi in eWeLink: "CELLA 1 CANTINA", "CELLA 2 CANTINA", "CELLA FRESCO".
+// Il vecchio 100072ac7d ("CELLA BT CANTINA") e offline da settimane: sostituito
+// da 10024a6fcd, che e la sonda effettiva della seconda cella di cantina.
 const DEVICES = [
   // CANTINA — Bassa Temperatura
   { id: '1000bcc9a0', zona: 'Cella BT Cantina 1', zona_gruppo: 'Cantina', min: -22, max: -15 },
-  { id: '100072ac7d', zona: 'Cella BT Cantina 2', zona_gruppo: 'Cantina', min: -22, max: -15 },
+  { id: '10024a6fcd', zona: 'Cella BT Cantina 2', zona_gruppo: 'Cantina', min: -22, max: -15 },
   // CUCINA — Temperature Positive
   { id: '100102f32a', zona: 'Cella Frigo Cucina', zona_gruppo: 'Cucina',  min: 0,   max: 4  },
 ];
