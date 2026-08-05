@@ -38,6 +38,37 @@ const STATUS_REF = db.collection('config').doc('sync_status');
 
 // I token vivono su Firestore, non nei GitHub Secrets: lo script non puo
 // riscrivere i propri secret, quindi il token rinnovato andrebbe perso a ogni run.
+const CODE_REF = db.collection('config').doc('oauth_code');
+
+// Se l'app ha depositato un code di autorizzazione, lo scambia con i token.
+// Sta qui e non in uno script a parte perche cosi la riautorizzazione funziona
+// quando fa comodo all'utente: lui autorizza, il primo giro utile la completa.
+async function consumaCodePendente() {
+  const snap = await CODE_REF.get();
+  if (!snap.exists || snap.data().usato || !snap.data().code) return null;
+
+  const d = snap.data();
+  console.log('Trovato un code di autorizzazione da consumare');
+  const body = JSON.stringify({
+    grantType: 'authorization_code',
+    code: d.code,
+    redirectUrl: 'https://danielenosenzo-dotcom.github.io/haccp-ancora/',
+  });
+  const sign = createHmac('sha256', APP_SECRET).update(body).digest('base64');
+  const res = await fetch(`${BASE_URL}/v2/user/oauth/token`, {
+    method: 'POST',
+    headers: { Authorization: 'Sign ' + sign, 'X-CK-Appid': APP_ID, 'Content-Type': 'application/json' },
+    body,
+  });
+  const json = await res.json();
+  await CODE_REF.set({ usato: true, esito: json.error === 0 ? 'ok' : (json.msg || String(json.error)) }, { merge: true });
+
+  if (json.error !== 0) { console.log('Scambio code fallito:', json.error, json.msg || ''); return null; }
+  await salvaToken(json.data.accessToken, json.data.refreshToken);
+  console.log('Riautorizzazione completata');
+  return json.data.accessToken;
+}
+
 async function leggiToken() {
   const snap = await TOKENS_REF.get();
   const d = snap.exists ? snap.data() : {};
@@ -116,8 +147,13 @@ async function main() {
   const now = new Date();
   console.log('Sync temperature eWeLink -> Firebase', now.toISOString());
 
+  // leggiToken per primo: imposta APP_ID/APP_SECRET da Firestore, che servono
+  // a firmare lo scambio del code qui sotto.
   let { accessToken, refreshToken, fonte } = await leggiToken();
   console.log('Token letti da:', fonte);
+
+  const daCode = await consumaCodePendente();
+  if (daCode) accessToken = daCode;
 
   let thingList;
   try {
