@@ -1,28 +1,29 @@
-name: Sync Temperature eWeLink → Firebase
+name: Watchdog — controllo sincronizzazione temperature
 
+# Volutamente separato dal workflow di sync: se quello si rompe, questo
+# continua a girare e avvisa. Non tocca eWeLink, legge solo il battito su Firestore.
 on:
   schedule:
-    - cron: '0 * * * *'   # ogni ora
+    - cron: '35 * * * *'   # ogni ora, sfasato rispetto al sync
   workflow_dispatch:
 
 jobs:
-  sync:
+  watchdog:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Install dependencies
         run: npm install firebase-admin
-      - name: Sync temperatures
+
+      - name: Controlla battito sincronizzazione
         env:
-          EWELINK_APP_ID: ${{ secrets.EWELINK_APP_ID }}
-          EWELINK_APP_SECRET: ${{ secrets.EWELINK_APP_SECRET }}
-          EWELINK_ACCESS_TOKEN: ${{ secrets.EWELINK_ACCESS_TOKEN }}
-          EWELINK_REFRESH_TOKEN: ${{ secrets.EWELINK_REFRESH_TOKEN }}
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
-        run: node .github/scripts/sync-temperature.js
+        run: node .github/scripts/watchdog-sync.js
