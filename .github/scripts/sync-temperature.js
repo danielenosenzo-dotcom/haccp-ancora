@@ -238,6 +238,7 @@ async function main() {
   await STATUS_REF.set({
     lastOk: admin.firestore.Timestamp.fromDate(now),
     lastError: null,
+    lastErrorMsg: null,   // altrimenti un errore vecchio resta appiccicato agli allarmi futuri
     allarmeInviato: false,
   }, { merge: true });
 
