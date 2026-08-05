@@ -10,6 +10,7 @@ const DEVICES = [
   { id: '10024a6fcd', zona: 'Cella BT Cantina 2', zona_gruppo: 'Cantina', min: -22, max: -15 },
   // CUCINA — Temperature Positive
   { id: '100102f32a', zona: 'Cella Frigo Cucina', zona_gruppo: 'Cucina',  min: 0,   max: 4  },
+  { id: '1000bcc977', zona: 'Frigo colonna',      zona_gruppo: 'Cucina',  min: 0,   max: 4  },
 ];
 
 const NO_SENSOR = [
