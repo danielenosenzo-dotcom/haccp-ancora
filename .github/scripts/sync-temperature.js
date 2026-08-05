@@ -17,9 +17,12 @@ const NO_SENSOR = [
 // lo sbrinamento alza la temperatura per 20-30 minuti ed e normale.
 const ANOMALY_ALERT_DELAY_MS = 60 * 60 * 1000;
 
-const APP_ID     = process.env.EWELINK_APP_ID;
-const APP_SECRET = process.env.EWELINK_APP_SECRET;
-const BASE_URL   = 'https://eu-apia.coolkit.cc';
+// Credenziali app: preferite da Firestore. I GitHub Secrets restano come
+// ripiego, ma non sono affidabili — spazi o a capo invisibili nel valore
+// fanno fallire la firma HMAC con un errore che non dice dov'e il problema.
+let APP_ID     = process.env.EWELINK_APP_ID;
+let APP_SECRET = process.env.EWELINK_APP_SECRET;
+const BASE_URL = 'https://eu-apia.coolkit.cc';
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -37,12 +40,19 @@ const STATUS_REF = db.collection('config').doc('sync_status');
 // riscrivere i propri secret, quindi il token rinnovato andrebbe perso a ogni run.
 async function leggiToken() {
   const snap = await TOKENS_REF.get();
-  if (snap.exists && snap.data().refreshToken) {
-    return { accessToken: snap.data().accessToken, refreshToken: snap.data().refreshToken, fonte: 'firestore' };
+  const d = snap.exists ? snap.data() : {};
+
+  if (d.appId)     APP_ID     = String(d.appId).trim();
+  if (d.appSecret) APP_SECRET = String(d.appSecret).trim();
+  if (APP_ID)     APP_ID     = APP_ID.trim();
+  if (APP_SECRET) APP_SECRET = APP_SECRET.trim();
+
+  if (d.refreshToken) {
+    return { accessToken: d.accessToken, refreshToken: d.refreshToken, fonte: 'firestore' };
   }
   return {
-    accessToken:  process.env.EWELINK_ACCESS_TOKEN,
-    refreshToken: process.env.EWELINK_REFRESH_TOKEN,
+    accessToken:  (process.env.EWELINK_ACCESS_TOKEN  || '').trim(),
+    refreshToken: (process.env.EWELINK_REFRESH_TOKEN || '').trim(),
     fonte: 'secrets',
   };
 }
@@ -51,7 +61,7 @@ async function salvaToken(accessToken, refreshToken) {
   await TOKENS_REF.set({
     accessToken, refreshToken,
     updatedAt: admin.firestore.Timestamp.now(),
-  });
+  }, { merge: true }); // merge: non deve cancellare appId/appSecret
   console.log('Token aggiornati e salvati su Firestore');
 }
 
