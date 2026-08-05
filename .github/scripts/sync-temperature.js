@@ -178,23 +178,36 @@ async function main() {
     const temp   = raw !== undefined && raw !== 'unavailable' ? parseFloat(raw) : null;
 
     const fuoriSoglia = temp !== null && (temp < device.min || temp > device.max);
-    const status = !online ? 'offline' : (temp === null ? 'no_data' : (fuoriSoglia ? 'anomalia' : 'ok'));
 
     const liveRef = db.collection('celle_live').doc(device.id);
     const prev = (await liveRef.get()).data() || {};
 
     let anomaliaDa = null;
     let notificaInviata = prev.notificaInviata || false;
+    let status;
 
-    if (status === 'anomalia') {
-      anomaliaDa = (prev.status === 'anomalia' && prev.anomaliaDa) ? prev.anomaliaDa.toDate() : now;
-      if ((now - anomaliaDa) >= ANOMALY_ALERT_DELAY_MS && !notificaInviata) {
-        await inviaPush('Allarme cella HACCP',
-          `${device.zona}: ${temp}°C (range ${device.min}/${device.max}°C) da oltre un'ora`,
-          'haccp-cella-' + device.id);
-        notificaInviata = true;
+    // Una lettura isolata fuori soglia e quasi sempre uno sbrinamento (20-30 min).
+    // Va registrata come tale, non come anomalia: un registro pieno di sforamenti
+    // che non erano problemi e' piu' difficile da spiegare di uno pulito.
+    // Diventa anomalia solo se lo sforamento persiste oltre l'ora.
+    if (!online)            status = 'offline';
+    else if (temp === null) status = 'no_data';
+    else if (fuoriSoglia) {
+      const proseguiva = (prev.status === 'anomalia' || prev.status === 'sbrinamento') && prev.anomaliaDa;
+      anomaliaDa = proseguiva ? prev.anomaliaDa.toDate() : now;
+      if ((now - anomaliaDa) >= ANOMALY_ALERT_DELAY_MS) {
+        status = 'anomalia';
+        if (!notificaInviata) {
+          await inviaPush('Allarme cella HACCP',
+            `${device.zona}: ${temp}°C (range ${device.min}/${device.max}°C) da oltre un'ora`,
+            'haccp-cella-' + device.id);
+          notificaInviata = true;
+        }
+      } else {
+        status = 'sbrinamento';
       }
     } else {
+      status = 'ok';
       notificaInviata = false;
     }
 

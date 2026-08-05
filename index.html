@@ -191,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v9.8</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v9.9</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1130,7 +1130,7 @@ async function renderStoricoGiornaliero(){
           return `<div style="font-size:0.62rem;color:var(--muted);font-weight:700;margin-top:4px;text-transform:uppercase">${g}</div>`+
             cc.map(c=>`<div style="display:flex;justify-content:space-between;font-size:0.7rem;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
               <span style="color:var(--muted)">${c.zona}</span>
-              <span style="color:${c.status==='anomalia'?'var(--danger)':c.status==='no_sensor'?'var(--muted)':'var(--teal-l)'};font-weight:600">${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'—'}</span>
+              <span style="color:${c.status==='anomalia'?'var(--danger)':c.status==='sbrinamento'?'var(--gold)':c.status==='no_sensor'?'var(--muted)':'var(--teal-l)'};font-weight:600">${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'—'}${c.status==='sbrinamento'?' ❄️':''}</span>
             </div>`).join('');
         }).join('')}
       </div>
@@ -1330,14 +1330,14 @@ async function loadLiveCelle(){
       if(!gruppi[g]) return;
       html += `<div style="font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px">${iconeGruppi[g]||'📦'} ${g}</div>`;
       gruppi[g].forEach(c => {
-        const cls = c.status==='anomalia' ? 'li li-danger' : c.status==='offline' ? 'li li-warn' : c.status==='no_sensor' ? 'li' : 'li li-l';
-        const icon = c.status==='anomalia' ? '🚨' : c.status==='offline' ? '⚠️' : c.status==='no_sensor' ? '🔲' : '✅';
+        const cls = c.status==='anomalia' ? 'li li-danger' : (c.status==='offline'||c.status==='sbrinamento'||c.status==='no_data') ? 'li li-warn' : c.status==='no_sensor' ? 'li' : 'li li-l';
+        const icon = c.status==='anomalia' ? '🚨' : c.status==='sbrinamento' ? '❄️' : c.status==='offline' ? '⚠️' : c.status==='no_data' ? '⚠️' : c.status==='no_sensor' ? '🔲' : '✅';
         const ts = c.timestamp ? new Date(c.timestamp.seconds*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '--:--';
         const tempLabel = c.status==='no_sensor' ? '<span style="font-size:0.65rem;color:var(--muted)">In attesa sensore</span>' : `<div class="li-val">${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'N/D'}</div>`;
         html += `<div class="${cls}">
           <div>
             <div style="font-size:0.82rem;font-weight:600">${icon} ${c.zona}</div>
-            <div class="li-meta">Range: ${c.min}°C / ${c.max}°C${c.status!=='no_sensor'?' · ore '+ts:''}</div>
+            <div class="li-meta">Range: ${c.min}°C / ${c.max}°C${c.status!=='no_sensor'?' · ore '+ts:''}${c.status==='sbrinamento'?' · sbrinamento probabile':''}</div>
           </div>
           ${tempLabel}
         </div>`;
