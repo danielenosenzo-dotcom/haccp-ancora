@@ -3,10 +3,10 @@
 // e avvisa. Un allarme che dipende dal sistema che sorveglia e inutile.
 const admin = require('firebase-admin');
 
-// Il cron di GitHub sul piano gratuito non e puntuale: chiediamo ogni ora ma
-// consegna a 75-115 minuti. Una soglia di un'ora produrrebbe solo falsi allarmi.
-// Tre ore = due giri saltati, cioe un guasto vero e non un ritardo.
-const SOGLIA_MS = 3 * 60 * 60 * 1000;
+// Il cron di GitHub sul piano gratuito non e puntuale: ha consegnato anche
+// dopo 189 minuti. Per questo il sync chiede ogni 10 minuti invece che ogni ora.
+// Con richieste ogni 10 minuti due ore di silenzio sono un guasto vero.
+const SOGLIA_MS = 2 * 60 * 60 * 1000;
 
 admin.initializeApp({
   credential: admin.credential.cert({

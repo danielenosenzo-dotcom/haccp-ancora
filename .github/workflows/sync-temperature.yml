@@ -2,7 +2,11 @@ name: Sync Temperature eWeLink → Firebase
 
 on:
   schedule:
-    - cron: '0 * * * *'   # ogni ora
+    # Chiediamo ogni 10 minuti pur volendo una lettura oraria: il cron di GitHub
+    # sul piano gratuito salta molti giri e ha consegnato anche dopo 189 minuti.
+    # Chiedendo spesso, anche scartando la maggior parte dei tentativi il dato
+    # resta fresco. Il repo e pubblico: i minuti di esecuzione non si pagano.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:

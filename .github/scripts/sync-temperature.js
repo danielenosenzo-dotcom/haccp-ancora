@@ -211,17 +211,28 @@ async function main() {
       notificaInviata = false;
     }
 
+    // La vista live si aggiorna a ogni giro; il registro storico no.
+    // Girando ogni 10 minuti, scrivere sempre riempirebbe il registro ASL di
+    // letture ravvicinate e illeggibili: li registriamo una volta all'ora,
+    // piu ogni cambio di stato, che e cio che conta davvero.
+    const ultimoLog = prev.ultimoLog ? prev.ultimoLog.toDate() : null;
+    const cambioStato = prev.status !== status;
+    const daRegistrare = !ultimoLog || cambioStato || (now - ultimoLog) >= 55 * 60 * 1000;
+
     const record = {
       zona: device.zona, zona_gruppo: device.zona_gruppo, deviceId: device.id,
       temp, min: device.min, max: device.max, status, online,
       anomaliaDa: anomaliaDa ? admin.firestore.Timestamp.fromDate(anomaliaDa) : null,
       notificaInviata,
       timestamp: admin.firestore.Timestamp.fromDate(now),
+      ultimoLog: daRegistrare ? admin.firestore.Timestamp.fromDate(now) : (prev.ultimoLog || null),
       source: 'ewelink-auto',
     };
     batch.set(liveRef, record);
-    batch.set(db.collection('temperature').doc(), { ...record, operatore: 'Sistema automatico' });
-    console.log(`${device.zona}: ${temp !== null ? temp + '°C' : 'N/D'} [${status}]`);
+    if (daRegistrare) {
+      batch.set(db.collection('temperature').doc(), { ...record, operatore: 'Sistema automatico' });
+    }
+    console.log(`${device.zona}: ${temp !== null ? temp + '°C' : 'N/D'} [${status}]${daRegistrare ? ' registrato' : ''}`);
   }
 
   for (const ns of NO_SENSOR) {
