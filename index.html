@@ -191,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v9.9</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v10.0</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1280,7 +1280,9 @@ async function enablePushNotifications(){
 
 // Un dato vecchio non deve mai sembrare un dato buono: se la rilevazione
 // e ferma, va detto in modo inequivocabile.
-const STALE_MS = 60 * 60 * 1000;
+// Allineata al watchdog: il cron di GitHub consegna a 75-115 minuti invece di 60,
+// quindi sotto le 3 ore un ritardo e fisiologico, non un guasto.
+const STALE_MS = 3 * 60 * 60 * 1000;
 
 function daQuantoTempo(ms){
   const min = Math.round(ms/60000);
@@ -1481,6 +1483,19 @@ function renderLottiLogs(){
 // ═══════════════════════════════════════════════════════
 // SCADENZE
 // ═══════════════════════════════════════════════════════
+
+// Accorpa invece di duplicare: stampare 11 etichette dello stesso prodotto con
+// la stessa scadenza deve dare una riga "x11", non undici righe identiche.
+function aggiungiScadenza(scads, voce, pezzi){
+  pezzi = pezzi || 1;
+  const chiave = s => (s.prod||'')+'|'+(s.scad||'')+'|'+(s.qta||'');
+  const nuova = { prod: voce.prod, prodData: voce.prodData, scad: voce.scad, qta: voce.qta||'' };
+  const esistente = scads.find(s => chiave(s) === chiave(nuova));
+  if(esistente) esistente.pezzi = (esistente.pezzi||1) + pezzi;
+  else scads.push({ id: uid(), ...nuova, pezzi });
+  return scads;
+}
+
 function saveScadenza(){
   const prod=document.getElementById('sProd').value.trim();
   const prodData=document.getElementById('sProd_data').value;
@@ -1488,7 +1503,7 @@ function saveScadenza(){
   const qta=document.getElementById('sQta').value;
   if(!prod||!scad){ alert('Inserisci prodotto e data scadenza'); return; }
   const scads=ls('scadenze');
-  scads.push({id:uid(),prod,prodData,scad,qta});
+  aggiungiScadenza(scads,{prod,prodData,scad,qta});
   lss('scadenze',scads);
   document.getElementById('sProd').value='';
   document.getElementById('sProd_data').value='';
@@ -1512,7 +1527,7 @@ function renderScadenze(){
     else{ badge=`<span class="badge b-g">${d}gg</span>`; }
     return `<div class="${cls}" style="cursor:default">
       <div>
-        <div style="font-size:0.85rem;font-weight:500">${s.prod}</div>
+        <div style="font-size:0.85rem;font-weight:500">${s.prod}${s.pezzi>1?` <span style="color:var(--gold);font-weight:600">×${s.pezzi}</span>`:''}</div>
         <div class="li-meta">Scade: ${fmtDate(s.scad)}${s.qta?' — '+s.qta:''}</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">${badge}
@@ -1766,7 +1781,7 @@ function generatePDF(){
   lss('labels',labels);
   addActivity(`🏷️ Etichetta: ${p.name}`);
   const scads=ls('scadenze');
-  scads.push({id:uid(),prod:p.name,prodData:dataProd,scad:addDays(dataProd,p.shelf),qta:qta||''});
+  aggiungiScadenza(scads,{prod:p.name,prodData:dataProd,scad:addDays(dataProd,p.shelf),qta:qta||''});
   lss('scadenze',scads);
 }
 
@@ -2147,9 +2162,7 @@ function generateBatchPDF(){
   cart.forEach(item=>{
     labels.unshift({id:uid(),date:today(),product:item.product.name,dataProd,dataScad:addDays(dataProd,item.product.shelf),op,qta:item.qta,copies:item.copies});
     const scads=ls('scadenze');
-    for(let i=0;i<item.copies;i++){
-      scads.push({id:uid(),prod:item.product.name,prodData:dataProd,scad:addDays(dataProd,item.product.shelf),qta:item.qta||''});
-    }
+    aggiungiScadenza(scads,{prod:item.product.name,prodData:dataProd,scad:addDays(dataProd,item.product.shelf),qta:item.qta||''},item.copies);
     lss('scadenze',scads);
   });
   lss('labels',labels);
