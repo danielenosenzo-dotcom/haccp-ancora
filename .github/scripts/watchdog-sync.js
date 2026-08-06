@@ -5,8 +5,9 @@ const admin = require('firebase-admin');
 
 // Il cron di GitHub sul piano gratuito non e puntuale: ha consegnato anche
 // dopo 189 minuti. Per questo il sync chiede ogni 10 minuti invece che ogni ora.
-// Con richieste ogni 10 minuti due ore di silenzio sono un guasto vero.
-const SOGLIA_MS = 2 * 60 * 60 * 1000;
+// Finche la schedulazione dipende da GitHub non si puo scendere sotto le 4 ore
+// senza falsi allarmi. Con uno scheduler affidabile va riportata a 1 ora.
+const SOGLIA_MS = 4 * 60 * 60 * 1000;
 
 admin.initializeApp({
   credential: admin.credential.cert({
