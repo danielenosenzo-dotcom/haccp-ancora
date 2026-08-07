@@ -31,20 +31,27 @@ Compila i campi: IP e credenziali telecamera, chiave Anthropic, chiave privata
 Firebase. **Il file resta solo sul NAS**: non entra nell'immagine del contenitore
 e non va condiviso.
 
-### 2. Caricamento del programma
+### 2. Avvio
 
-Copia sul NAS la cartella `nas-telecamera` (contiene `Dockerfile`,
-`docker-compose.yml`, `leggi-display.js`).
+Non serve copiare il programma sul NAS: Container Station lo prende da GitHub.
 
-### 3. Avvio
+In Container Station → **Crea** → **Crea applicazione**, dai un nome
+(`lettore-celle`) e incolla esattamente questo:
 
-In Container Station → Crea → Crea applicazione, incolla il contenuto di
-`docker-compose.yml` e avvia.
+    services:
+      lettore-celle:
+        build: https://github.com/danielenosenzo-dotcom/haccp-ancora.git#main:nas-telecamera
+        container_name: lettore-celle
+        restart: unless-stopped
+        environment:
+          CONFIG_PATH: /config/config.json
+        volumes:
+          - /share/Container/lettore-celle:/config:ro
 
-Da riga di comando (SSH sul NAS) l'equivalente è:
+Poi avvia. La prima volta impiega qualche minuto: scarica e costruisce.
 
-    cd /share/Container/nas-telecamera
-    docker compose up -d --build
+Per aggiornarlo in futuro basta ricostruire l'applicazione: riprende da GitHub
+la versione aggiornata.
 
 ### 4. Verifica
 

@@ -1,11 +1,12 @@
 services:
   lettore-celle:
-    build: .
+    # Scarica e costruisce direttamente da GitHub: non serve copiare file sul NAS.
+    build: https://github.com/danielenosenzo-dotcom/haccp-ancora.git#main:nas-telecamera
     container_name: lettore-celle
     restart: unless-stopped
     environment:
       CONFIG_PATH: /config/config.json
     volumes:
-      # Cartella sul NAS che contiene config.json — NON entra nell'immagine,
-      # cosi le credenziali restano solo sul tuo NAS.
+      # Cartella sul NAS con config.json — le credenziali restano solo li,
+      # non entrano nell'immagine e non finiscono su GitHub.
       - /share/Container/lettore-celle:/config:ro
