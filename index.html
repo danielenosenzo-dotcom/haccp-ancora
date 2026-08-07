@@ -1332,8 +1332,8 @@ async function loadLiveCelle(){
       if(!gruppi[g]) return;
       html += `<div style="font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px">${iconeGruppi[g]||'📦'} ${g}</div>`;
       gruppi[g].forEach(c => {
-        const cls = c.status==='anomalia' ? 'li li-danger' : (c.status==='offline'||c.status==='sbrinamento'||c.status==='no_data') ? 'li li-warn' : c.status==='no_sensor' ? 'li' : 'li li-l';
-        const icon = c.status==='anomalia' ? '🚨' : c.status==='sbrinamento' ? '❄️' : c.status==='offline' ? '⚠️' : c.status==='no_data' ? '⚠️' : c.status==='no_sensor' ? '🔲' : '✅';
+        const cls = c.status==='anomalia' ? 'li li-danger' : (c.status==='offline'||c.status==='sbrinamento'||c.status==='no_data'||c.status==='lettura_fallita') ? 'li li-warn' : c.status==='no_sensor' ? 'li' : 'li li-l';
+        const icon = c.status==='anomalia' ? '🚨' : c.status==='sbrinamento' ? '❄️' : c.status==='lettura_fallita' ? '👁️' : c.status==='offline' ? '⚠️' : c.status==='no_data' ? '⚠️' : c.status==='no_sensor' ? '🔲' : '✅';
         const ts = c.timestamp ? new Date(c.timestamp.seconds*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '--:--';
         // Una sonda offline continua a restituire l'ultimo valore letto: va mostrato
         // come dato vecchio, non come temperatura attuale.
@@ -1341,7 +1341,9 @@ async function loadLiveCelle(){
           ? '<span style="font-size:0.65rem;color:var(--muted)">In attesa sensore</span>'
           : c.status==='offline'
             ? `<div style="text-align:right"><div style="font-size:0.62rem;color:var(--gold)">sonda scollegata</div><div style="font-size:0.72rem;color:var(--muted)">ultimo: ${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'N/D'}</div></div>`
-            : `<div class="li-val">${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'N/D'}</div>`;
+            : c.status==='lettura_fallita'
+              ? '<div style="text-align:right"><div style="font-size:0.62rem;color:var(--gold)">display non leggibile</div><div style="font-size:0.65rem;color:var(--muted)">controlla a mano</div></div>'
+              : `<div class="li-val">${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'N/D'}</div>`;
         html += `<div class="${cls}">
           <div>
             <div style="font-size:0.82rem;font-weight:600">${icon} ${c.zona}</div>

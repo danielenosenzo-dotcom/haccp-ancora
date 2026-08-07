@@ -1,0 +1,44 @@
+{
+  "intervalloMinuti": 60,
+
+  "telecamera": {
+    "ip": "192.168.1.XXX",
+    "utente": "NOME_ACCOUNT_TELECAMERA",
+    "password": "PASSWORD_ACCOUNT_TELECAMERA"
+  },
+
+  "anthropic": {
+    "apiKey": "sk-ant-..."
+  },
+
+  "celle": [
+    {
+      "id": "cam_cantina_1",
+      "etichetta": "display sinistro",
+      "posizione": "il display piu a sinistra, sul quadro di controllo piccolo",
+      "zona": "Cella BT Cantina 1",
+      "zona_gruppo": "Cantina",
+      "min": -22,
+      "max": -15,
+      "plausibileMin": -40,
+      "plausibileMax": 20
+    },
+    {
+      "id": "cam_cantina_2",
+      "etichetta": "display destro",
+      "posizione": "il display piu a destra, sul quadro di controllo grande",
+      "zona": "Cella BT Cantina 2",
+      "zona_gruppo": "Cantina",
+      "min": -22,
+      "max": -15,
+      "plausibileMin": -40,
+      "plausibileMax": 20
+    }
+  ],
+
+  "firebase": {
+    "projectId": "lancora-haccp",
+    "clientEmail": "firebase-adminsdk-fbsvc@lancora-haccp.iam.gserviceaccount.com",
+    "privateKey": "-----BEGIN PRIVATE KEY-----\nINCOLLA_QUI\n-----END PRIVATE KEY-----\n"
+  }
+}

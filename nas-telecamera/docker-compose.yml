@@ -1,0 +1,11 @@
+services:
+  lettore-celle:
+    build: .
+    container_name: lettore-celle
+    restart: unless-stopped
+    environment:
+      CONFIG_PATH: /config/config.json
+    volumes:
+      # Cartella sul NAS che contiene config.json — NON entra nell'immagine,
+      # cosi le credenziali restano solo sul tuo NAS.
+      - /share/Container/lettore-celle:/config:ro
