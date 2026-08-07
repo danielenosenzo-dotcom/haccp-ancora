@@ -24,7 +24,7 @@ pezzo già presente che sia sempre acceso e dentro quella rete.
 
 ### 1. Cartella di configurazione sul NAS
 
-Crea la cartella `/share/Container/lettore-celle` e copiaci dentro
+Crea la cartella `/share/Public/lettore-celle` e copiaci dentro
 `config.esempio.json`, rinominandolo in `config.json`.
 
 Compila i campi: IP e credenziali telecamera, chiave Anthropic, chiave privata
@@ -46,7 +46,7 @@ In Container Station → **Crea** → **Crea applicazione**, dai un nome
         environment:
           CONFIG_PATH: /config/config.json
         volumes:
-          - /share/Container/lettore-celle:/config:ro
+          - /share/Public/lettore-celle:/config:ro
 
 Poi avvia. La prima volta impiega qualche minuto: scarica e costruisce.
 

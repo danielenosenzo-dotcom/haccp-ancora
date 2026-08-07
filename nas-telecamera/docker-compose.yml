@@ -9,4 +9,4 @@ services:
     volumes:
       # Cartella sul NAS con config.json — le credenziali restano solo li,
       # non entrano nell'immagine e non finiscono su GitHub.
-      - /share/Container/lettore-celle:/config:ro
+      - /share/Public/lettore-celle:/config:ro
