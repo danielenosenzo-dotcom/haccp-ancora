@@ -191,7 +191,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v10.0</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v10.1</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -260,11 +260,15 @@ textarea{resize:vertical;min-height:65px}
     <button class="btn btn-g" id="btnPushEnable" onclick="enablePushNotifications()">🔔 Attiva notifiche su questo telefono</button>
   </div>
 
-  <!-- REGISTRAZIONE ASL GIORNALIERA -->
+  <!-- REGISTRAZIONE ASL GIORNALIERA MANUALE -->
   <div class="card">
     <div class="card-t">📋 Registro ASL — Giornaliero</div>
     <div id="regOggiStatus" style="font-size:0.75rem;margin-bottom:10px;padding:8px;border-radius:8px;background:rgba(14,124,123,0.1);color:var(--teal-l)">Verifica registrazione di oggi...</div>
-    <label>Operatore</label>
+    <div style="font-size:0.72rem;color:var(--muted);line-height:1.5;margin-bottom:10px">
+      Leggi le temperature dalla telecamera e inseriscile qui. Lascia vuota una cella se non la rilevi.
+    </div>
+    <div id="regCelleInput"></div>
+    <label style="margin-top:10px">Operatore</label>
     <select id="rgOp" onchange="checkOtherOp('rgOp','rgOpAlt')">
       <option value="">— Seleziona —</option>
     </select>
@@ -1000,7 +1004,7 @@ function show(id,btn){
   if(id==='home') renderHome();
   if(id==='lotti') renderLottiLogs();
   if(id==='scad'){ eliminaScaduteAuto(); renderScadenze(); }
-  if(id==='temp'){ loadLiveCelle(); reattachPushListener(); clearInterval(window._celleTimer); window._celleTimer=setInterval(loadLiveCelle,5*60*1000);}
+  if(id==='temp'){ checkRegOggi(); loadLiveCelle(); reattachPushListener(); clearInterval(window._celleTimer); window._celleTimer=setInterval(loadLiveCelle,5*60*1000);}
   if(id==='label') renderProducts('Tutti');
   if(id==='bilanc') bInit();
 }
@@ -1068,27 +1072,89 @@ async function checkRegOggi(){
     status.style.color = 'var(--success)';
     status.textContent = `✅ Oggi (${oggi}) già registrato alle ${giaFatta.ora} da ${giaFatta.operatore}`;
     btn.textContent = '🔄 Registra di nuovo (sovrascrive)';
+    // Precompila con quanto gia registrato oggi, abbinando per nome zona.
+    const pre = {};
+    (giaFatta.celle||[]).forEach(rc => {
+      const c = CELLE_MANUALI.find(x => x.zona === rc.zona);
+      if(c && rc.temp != null) pre[c.id] = rc.temp;
+    });
+    renderRegCelleInput(pre);
   } else {
     status.style.background = 'rgba(201,168,76,0.15)';
     status.style.color = 'var(--gold)';
     status.textContent = `⚠️ Oggi (${oggi}) non ancora registrato`;
     btn.textContent = '✅ Registra lettura di oggi';
+    renderRegCelleInput(null);
   }
 }
 
+// Celle da registrare a mano leggendo dalla telecamera.
+const CELLE_MANUALI = [
+  { id:'cantina1', zona:'Cella BT Cantina 1', zona_gruppo:'Cantina', min:-22, max:-15 },
+  { id:'cantina2', zona:'Cella BT Cantina 2', zona_gruppo:'Cantina', min:-22, max:-15 },
+  { id:'cucina',   zona:'Cella Frigo Cucina', zona_gruppo:'Cucina',  min:0,   max:4  },
+  { id:'colonna',  zona:'Frigo colonna',      zona_gruppo:'Cucina',  min:0,   max:4  },
+  { id:'dolci',    zona:'Cella Frigo Dolci',  zona_gruppo:'Cucina',  min:0,   max:4  },
+];
+
+function renderRegCelleInput(precompila){
+  const box = document.getElementById('regCelleInput');
+  if(!box) return;
+  let gruppo = '';
+  box.innerHTML = CELLE_MANUALI.map(c => {
+    const testa = c.zona_gruppo !== gruppo ? (gruppo = c.zona_gruppo,
+      `<div style="font-size:0.62rem;color:var(--muted);font-weight:700;text-transform:uppercase;margin:10px 0 4px">${c.zona_gruppo}</div>`) : '';
+    const val = precompila && precompila[c.id] != null ? precompila[c.id] : '';
+    return testa + `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="flex:1;font-size:0.8rem">${c.zona}</span>
+      <span style="font-size:0.62rem;color:var(--muted)">${c.min}/${c.max}°</span>
+      <input type="number" step="0.1" inputmode="decimal" id="rgc_${c.id}" value="${val}"
+        placeholder="—" style="width:78px;text-align:center"
+        oninput="valutaRegCella('${c.id}')">
+      <span id="rgcbadge_${c.id}" style="width:20px;text-align:center;font-size:0.9rem"></span>
+    </div>`;
+  }).join('');
+  CELLE_MANUALI.forEach(c => valutaRegCella(c.id));
+}
+
+function valutaRegCella(id){
+  const c = CELLE_MANUALI.find(x => x.id===id);
+  const el = document.getElementById('rgc_'+id);
+  const badge = document.getElementById('rgcbadge_'+id);
+  if(!c || !el || !badge) return;
+  const v = el.value.trim();
+  if(v===''){ badge.textContent=''; el.style.borderColor=''; return; }
+  const n = parseFloat(v.replace(',','.'));
+  if(isNaN(n)){ badge.textContent='?'; return; }
+  const fuori = n < c.min || n > c.max;
+  badge.textContent = fuori ? '⚠️' : '✅';
+  el.style.borderColor = fuori ? 'var(--danger)' : 'var(--success)';
+}
+
 async function saveRegGiornaliera(){
-  if(!_celleSnapshot.length){ alert('Attendi il caricamento delle temperature dai sensori'); return; }
   const op = getOp('rgOp','rgOpAlt');
   if(!op){ alert('Seleziona operatore'); return; }
-  const noteGen = document.getElementById('rgNote').value;
+
+  const celle = [];
+  let inserite = 0;
+  for(const c of CELLE_MANUALI){
+    const el = document.getElementById('rgc_'+c.id);
+    const v = el ? el.value.trim() : '';
+    let temp = null, status = 'non_rilevata';
+    if(v!==''){
+      const n = parseFloat(v.replace(',','.'));
+      if(isNaN(n)){ alert('Valore non valido per '+c.zona); return; }
+      temp = n; inserite++;
+      status = (n < c.min || n > c.max) ? 'anomalia' : 'ok';
+    }
+    celle.push({ zona:c.zona, zona_gruppo:c.zona_gruppo, temp, min:c.min, max:c.max, status });
+  }
+  if(!inserite){ alert('Inserisci almeno una temperatura'); return; }
+
   const record = {
-    id: uid(),
-    date: today(),
-    ora: nowTime(),
-    operatore: op,
-    note: noteGen,
-    celle: _celleSnapshot.map(c=>({ zona:c.zona, temp:c.temp, min:c.min, max:c.max, status:c.status })),
-    source: 'giornaliero-auto',
+    id: uid(), date: today(), ora: nowTime(),
+    operatore: op, note: document.getElementById('rgNote').value,
+    celle, source: 'giornaliero-manuale',
   };
   const fdb = firestoreDb || firebase.firestore();
   await fdb.collection('reg_giornaliera').doc(record.date).set({
