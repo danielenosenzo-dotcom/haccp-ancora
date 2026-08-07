@@ -14,7 +14,6 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script src="firebase-config.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -191,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v10.1</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v10.2</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -239,26 +238,6 @@ textarea{resize:vertical;min-height:65px}
 
 <!-- ═══════════════════════════════ TEMPERATURE ═══════════════════════════════ -->
 <section class="sec" id="temp">
-
-  <!-- LIVE CELLE AUTOMATICHE -->
-  <div class="card" id="liveCelleCard">
-    <div class="card-t" style="display:flex;align-items:center;justify-content:space-between">
-      <span>📡 Celle in tempo reale</span>
-      <span id="liveCelleAgg" style="font-size:0.6rem;color:var(--muted)">Caricamento...</span>
-    </div>
-    <div id="staleWarn" style="display:none;background:rgba(224,92,92,0.15);border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px;margin-bottom:10px;font-size:0.78rem;line-height:1.5"></div>
-    <div id="liveCelleList">
-      <div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Connessione in corso...</div></div>
-    </div>
-    <button class="btn btn-o" style="margin-top:10px;font-size:0.75rem;padding:8px" onclick="loadLiveCelle()">🔄 Aggiorna</button>
-  </div>
-
-  <!-- NOTIFICHE PUSH ALLARME -->
-  <div class="card">
-    <div class="card-t">🔔 Notifiche di allarme</div>
-    <div id="pushStatus" style="font-size:0.75rem;margin-bottom:10px;padding:8px;border-radius:8px;background:rgba(14,124,123,0.1);color:var(--teal-l)">Ricevi una notifica sul telefono se una cella resta fuori soglia per più di un'ora.</div>
-    <button class="btn btn-g" id="btnPushEnable" onclick="enablePushNotifications()">🔔 Attiva notifiche su questo telefono</button>
-  </div>
 
   <!-- REGISTRAZIONE ASL GIORNALIERA MANUALE -->
   <div class="card">
@@ -1004,7 +983,7 @@ function show(id,btn){
   if(id==='home') renderHome();
   if(id==='lotti') renderLottiLogs();
   if(id==='scad'){ eliminaScaduteAuto(); renderScadenze(); }
-  if(id==='temp'){ checkRegOggi(); loadLiveCelle(); reattachPushListener(); clearInterval(window._celleTimer); window._celleTimer=setInterval(loadLiveCelle,5*60*1000);}
+  if(id==='temp'){ checkRegOggi(); renderStoricoGiornaliero(); }
   if(id==='label') renderProducts('Tutti');
   if(id==='bilanc') bInit();
 }
@@ -1055,7 +1034,6 @@ function renderHome(){
 // ═══════════════════════════════════════════════════════
 // REGISTRAZIONE GIORNALIERA CELLE (ASL)
 // ═══════════════════════════════════════════════════════
-let _celleSnapshot = [];
 
 async function checkRegOggi(){
   const oggi = today();
@@ -1204,239 +1182,6 @@ async function renderStoricoGiornaliero(){
   }).join('');
 }
 
-// ═══════════════════════════════════════════════════════
-// LIVE CELLE DA FIREBASE
-// ═══════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════
-// NOTIFICHE PUSH ALLARME CELLE (Firebase Cloud Messaging)
-// ═══════════════════════════════════════════════════════
-// IMPORTANTE: sostituire con la VAPID key generata da
-// Firebase Console → Impostazioni progetto → Cloud Messaging → Web configuration
-const FCM_VAPID_KEY = 'BNjCovajmwLw9v_R9JCi1yY8SFPWlJ1Ul-8GHfBWDT0OKyrCsFsQGUW7wu_6djpo1vrSmYlhl19BPG057nEUexw';
-
-let _pushListenerAttached = false;
-let _pushCheckInFlight = false;
-
-function setPushCard(stato, testo, bloccaBtn){
-  const status = document.getElementById('pushStatus');
-  const btn = document.getElementById('btnPushEnable');
-  if(!status || !btn) return;
-  const colori = {
-    ok:    ['rgba(76,175,130,0.15)',  'var(--success)'],
-    warn:  ['rgba(201,168,76,0.15)',  'var(--gold)'],
-    err:   ['rgba(224,92,92,0.15)',   'var(--danger)'],
-  };
-  const [bg, fg] = colori[stato] || colori.warn;
-  status.style.background = bg; status.style.color = fg;
-  status.textContent = testo;
-  btn.disabled = !!bloccaBtn;
-  btn.textContent = bloccaBtn ? '✅ Notifiche attive' : '🔔 Attiva notifiche su questo telefono';
-}
-
-// Scrive su Firestore lo stato diagnostico delle notifiche, per capire da remoto
-// perché su un dato dispositivo l'attivazione non viene ricordata
-async function logPushDiag(fase, extra){
-  try{
-    const fdb = firestoreDb || firebase.firestore();
-    await fdb.collection('push_diag').doc('ultimo').set({
-      fase,
-      permission: (typeof Notification!=='undefined') ? Notification.permission : 'n/d',
-      swSupport: ('serviceWorker' in navigator),
-      standalone: window.matchMedia && window.matchMedia('(display-mode: standalone)').matches,
-      ua: navigator.userAgent,
-      url: location.href,
-      ts: firebase.firestore.Timestamp.now(),
-      ...(extra||{})
-    });
-  }catch(e){ console.warn('logPushDiag:', e); }
-}
-
-// Verifica lo stato REALE delle notifiche: non basta il permesso del browser,
-// serve una sottoscrizione push viva — è quella che determina se l'allarme arriverà.
-async function reattachPushListener(){
-  if(!('serviceWorker' in navigator) || !('Notification' in window)){
-    setPushCard('err', '⚠️ Questo browser non supporta le notifiche push.', false);
-    return;
-  }
-  if(Notification.permission === 'denied'){
-    setPushCard('err', '⚠️ Notifiche bloccate per questo sito. Sbloccale dalle impostazioni del browser.', false);
-    logPushDiag('permesso-negato');
-    return;
-  }
-  if(Notification.permission !== 'granted'){
-    setPushCard('warn', '🔔 Notifiche non ancora attive su questo telefono. Tocca il pulsante per attivarle.', false);
-    logPushDiag('permesso-non-memorizzato');
-    return;
-  }
-
-  // Il permesso è concesso: questo basta a garantire che l'allarme arrivi.
-  // Lo stato è definitivo — i controlli sul service worker qui sotto servono solo
-  // ad agganciare il listener, e un loro ritardo non deve mai far tornare
-  // indietro la card facendo credere che le notifiche siano spente.
-  setPushCard('ok', '✅ Notifiche attive su questo telefono.', true);
-
-  if(_pushCheckInFlight || _pushListenerAttached) return;
-  _pushCheckInFlight = true;
-  try{
-    await navigator.serviceWorker.register('firebase-messaging-sw.js');
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    logPushDiag(sub ? 'ok-attive' : 'sottoscrizione-assente', {
-      endpoint: sub ? (sub.endpoint||'').substring(0,60) : null,
-      swState: reg.active ? reg.active.state : 'nessuno',
-    });
-
-    const messaging = firebase.messaging();
-    messaging.onMessage(payload => {
-      const t = payload.notification?.title || '🚨 Allarme Cella HACCP';
-      const b = payload.notification?.body || 'Una cella è fuori soglia';
-      reg.showNotification(t, { body: b, vibrate:[200,100,200,100,200], requireInteraction:true, silent:false, tag:'haccp-cella-alert', renotify:true });
-    });
-    _pushListenerAttached = true;
-  }catch(e){
-    console.warn('reattachPushListener:', e);
-    logPushDiag('errore-verifica', { errore: String(e && e.message || e) });
-  }finally{
-    _pushCheckInFlight = false;
-  }
-}
-
-async function enablePushNotifications(){
-  const status = document.getElementById('pushStatus');
-  const btn = document.getElementById('btnPushEnable');
-  if(!('serviceWorker' in navigator) || !('Notification' in window)){
-    status.style.background='rgba(224,92,92,0.15)'; status.style.color='var(--danger)';
-    status.textContent='⚠️ Questo browser non supporta le notifiche push.';
-    return;
-  }
-  try{
-    btn.disabled = true; btn.textContent='Attivazione in corso...';
-    const perm = await Notification.requestPermission();
-    if(perm !== 'granted'){
-      status.style.background='rgba(224,92,92,0.15)'; status.style.color='var(--danger)';
-      status.textContent='⚠️ Permesso negato. Abilita le notifiche nelle impostazioni del browser per questo sito.';
-      btn.disabled=false; btn.textContent='🔔 Attiva notifiche su questo telefono';
-      return;
-    }
-    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
-    const messaging = firebase.messaging();
-    const token = await messaging.getToken({ vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg });
-    if(!token) throw new Error('Token non generato');
-    const fdb = firestoreDb || firebase.firestore();
-    await fdb.collection('fcm_tokens').doc(token).set({
-      token, createdAt: firebase.firestore.Timestamp.now(),
-      userAgent: navigator.userAgent, role: sessionStorage.getItem('role')||'', name: sessionStorage.getItem('userName')||''
-    });
-    // Notifiche ricevute mentre l'app è aperta in primo piano
-    messaging.onMessage(payload => {
-      const t = payload.notification?.title || '🚨 Allarme Cella HACCP';
-      const b = payload.notification?.body || 'Una cella è fuori soglia';
-      reg.showNotification(t, { body: b, vibrate:[200,100,200,100,200], requireInteraction:true, silent:false, tag:'haccp-cella-alert', renotify:true });
-    });
-    status.style.background='rgba(76,175,130,0.15)'; status.style.color='var(--success)';
-    status.textContent='✅ Notifiche attivate su questo telefono. Riceverai un avviso se una cella resta fuori soglia per più di un\'ora.';
-    btn.textContent='✅ Notifiche attive'; btn.disabled=true;
-  }catch(e){
-    console.error('Push setup error:', e);
-    status.style.background='rgba(224,92,92,0.15)'; status.style.color='var(--danger)';
-    status.textContent='⚠️ Errore attivazione: '+(e.message||e);
-    btn.disabled=false; btn.textContent='🔔 Attiva notifiche su questo telefono';
-  }
-}
-
-// Un dato vecchio non deve mai sembrare un dato buono: se la rilevazione
-// e ferma, va detto in modo inequivocabile.
-// Allineata al watchdog: il cron di GitHub consegna a 75-115 minuti invece di 60,
-// quindi sotto le 3 ore un ritardo e fisiologico, non un guasto.
-const STALE_MS = 3 * 60 * 60 * 1000;
-
-function daQuantoTempo(ms){
-  const min = Math.round(ms/60000);
-  if(min < 90) return min + ' minuti';
-  const ore = Math.round(min/60);
-  if(ore < 48) return ore + ' ore';
-  return Math.round(ore/24) + ' giorni';
-}
-
-function mostraDatiFermi(celle){
-  const box = document.getElementById('staleWarn');
-  if(!box) return;
-  const ts = celle.map(c => c.timestamp ? c.timestamp.seconds*1000 : 0).filter(Boolean);
-  if(!ts.length){ box.style.display='none'; return; }
-  const eta = Date.now() - Math.max(...ts);
-  if(eta > STALE_MS){
-    box.style.display='block';
-    box.innerHTML = `⛔ <strong>Rilevazione ferma da ${daQuantoTempo(eta)}.</strong><br>
-      Le temperature qui sotto sono vecchie: le celle NON sono monitorate. Controllale a mano e registra la lettura.`;
-  } else {
-    box.style.display='none';
-  }
-}
-
-async function loadLiveCelle(){
-  const box = document.getElementById('liveCelleList');
-  const agg = document.getElementById('liveCelleAgg');
-  reattachPushListener();
-  try {
-    const fdb = firestoreDb || firebase.firestore();
-    const snap = await fdb.collection('celle_live').get();
-    if(snap.empty){ box.innerHTML='<div style="font-size:0.78rem;color:var(--muted);padding:8px">Nessun dato disponibile</div>'; return; }
-    const celle = [];
-    snap.forEach(doc => celle.push(doc.data()));
-    celle.sort((a,b) => a.zona.localeCompare(b.zona));
-    mostraDatiFermi(celle);
-    const gruppi = {};
-    celle.forEach(c => {
-      const g = c.zona_gruppo || 'Altro';
-      if(!gruppi[g]) gruppi[g] = [];
-      gruppi[g].push(c);
-    });
-    const ordineGruppi = ['Cantina','Cucina','Altro'];
-    const iconeGruppi = {'Cantina':'🏚️','Cucina':'🍳','Altro':'📦'};
-    let html = '';
-    ordineGruppi.forEach(g => {
-      if(!gruppi[g]) return;
-      html += `<div style="font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px">${iconeGruppi[g]||'📦'} ${g}</div>`;
-      gruppi[g].forEach(c => {
-        const cls = c.status==='anomalia' ? 'li li-danger' : (c.status==='offline'||c.status==='sbrinamento'||c.status==='no_data'||c.status==='lettura_fallita') ? 'li li-warn' : c.status==='no_sensor' ? 'li' : 'li li-l';
-        const icon = c.status==='anomalia' ? '🚨' : c.status==='sbrinamento' ? '❄️' : c.status==='lettura_fallita' ? '👁️' : c.status==='offline' ? '⚠️' : c.status==='no_data' ? '⚠️' : c.status==='no_sensor' ? '🔲' : '✅';
-        const ts = c.timestamp ? new Date(c.timestamp.seconds*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '--:--';
-        // Una sonda offline continua a restituire l'ultimo valore letto: va mostrato
-        // come dato vecchio, non come temperatura attuale.
-        const tempLabel = c.status==='no_sensor'
-          ? '<span style="font-size:0.65rem;color:var(--muted)">In attesa sensore</span>'
-          : c.status==='offline'
-            ? `<div style="text-align:right"><div style="font-size:0.62rem;color:var(--gold)">sonda scollegata</div><div style="font-size:0.72rem;color:var(--muted)">ultimo: ${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'N/D'}</div></div>`
-            : c.status==='lettura_fallita'
-              ? '<div style="text-align:right"><div style="font-size:0.62rem;color:var(--gold)">display non leggibile</div><div style="font-size:0.65rem;color:var(--muted)">controlla a mano</div></div>'
-              : `<div class="li-val">${c.temp!==null&&c.temp!==undefined?c.temp+'°C':'N/D'}</div>`;
-        html += `<div class="${cls}">
-          <div>
-            <div style="font-size:0.82rem;font-weight:600">${icon} ${c.zona}</div>
-            <div class="li-meta">Range: ${c.min}°C / ${c.max}°C${c.status!=='no_sensor'?' · ore '+ts:''}${c.status==='sbrinamento'?' · sbrinamento probabile':''}</div>
-          </div>
-          ${tempLabel}
-        </div>`;
-      });
-    });
-    box.innerHTML = html;
-    agg.textContent = 'Aggiornato ' + new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-    _celleSnapshot = celle;
-    checkRegOggi();
-    renderStoricoGiornaliero();
-  } catch(e) {
-    box.innerHTML = `<div style="font-size:0.78rem;color:var(--danger);padding:8px">Errore: ${e.message||e}</div>`;
-    console.error(e);
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-// COTTURE
-// ═══════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════
-// LOTTI
-// ═══════════════════════════════════════════════════════
-let lottoSelectedProducts=[];
 
 function checkAltLottoFornitore(){
   const v=document.getElementById('lFornitore').value;
@@ -3243,7 +2988,6 @@ function initApp(){
     ['pulizie',          () => { renderChecklist('giornaliera'); renderPulizieLog('giornaliera'); }],
     ['home',             renderHome],
     ['pulizia scadenze', eliminaScaduteAuto],
-    ['notifiche push',   reattachPushListener],
   ];
   const falliti = [];
   passi.forEach(([nome, fn]) => {
