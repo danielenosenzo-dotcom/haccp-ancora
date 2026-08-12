@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v10.5</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v10.6</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -760,7 +760,9 @@ textarea{resize:vertical;min-height:65px}
       <span>tradizione</span><span>creativo</span><span>audace</span>
     </div>
     <div id="pmInfoPesce" style="font-size:0.68rem;color:var(--muted);line-height:1.5;margin:10px 0"></div>
-    <div id="pmList"></div>
+    <div id="pmScelti"></div>
+    <div style="font-size:0.66rem;color:var(--muted);margin:8px 0 4px">Tocca gli ingredienti da abbinare:</div>
+    <div id="pmList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
   </div>
 
   <!-- TRIANGOLI MOLECOLARI -->
@@ -3110,7 +3112,7 @@ function pmMotivi(p, ing){
 }
 
 let pmInizializzato=false;
-let pmSelezionato=null;
+let pmScelti=[];
 function pmInit(){
   const sel=document.getElementById('pmPesce');
   if(sel && !pmInizializzato){
@@ -3128,43 +3130,71 @@ function pmRender(){
   document.getElementById('pmInfoPesce').innerHTML=
     `pH ${pesce.ph} · magro (${pesce.grasso}%) · umami da cotto ${pesce.umamiCotto}/5 · ${pesce.texture}<br>${pesce.tecnica}`;
 
+  // Griglia: ingredienti della fascia audacia scelta, ordinati per affinità.
   const lista=PM_INGR
     .filter(i => i.cooc>=banda.min && i.cooc<maxCooc)
     .map(i => ({...i, score:pmFunzionale(pesce,i)}))
     .sort((a,b)=> b.score-a.score || b.cooc-a.cooc);
 
   const box=document.getElementById('pmList');
-  if(!lista.length){ box.innerHTML='<div style="font-size:0.75rem;color:var(--muted);padding:8px">Nessun ingrediente in questa fascia.</div>'; return; }
-  box.innerHTML=lista.map(i=>{
+  box.innerHTML = lista.length ? lista.map(i=>{
     const col=PM_COLORI[i.cat]||'var(--muted)';
-    const pct=Math.round(i.score*100);
-    const motivi=pmMotivi(pesce,i);
-    const aperto = pmSelezionato===i.nome;
-    const comune = i.cooc>=0.50?'abbinamento tradizionale':i.cooc>=0.20?'poco comune':'raro, quasi mai visto';
-    const triSuoi = PM_TRIANGOLI.filter(t=>t[0].toLowerCase().includes(i.nome.toLowerCase().split(' ')[0]));
-    return `<div style="border-bottom:1px solid rgba(255,255,255,0.06)">
-      <div onclick="pmTocca('${i.nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:9px;padding:8px 2px;cursor:pointer;${aperto?'background:rgba(14,124,123,0.08)':''}">
-        <div style="width:20px;text-align:center">${i.icona}</div>
-        <div style="flex:1;min-width:0"><div style="font-size:0.82rem">${i.nome}</div>
-          <div style="font-size:0.6rem;color:${col}">${i.cat}</div></div>
-        <div style="flex:1;height:12px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;max-width:100px">
-          <div style="width:${pct}%;height:100%;background:${col};border-radius:999px"></div></div>
-        <div style="width:28px;text-align:right;font-size:0.7rem;color:var(--muted)">${pct}</div>
-        <div style="width:12px;color:var(--muted);font-size:0.8rem">${aperto?'▾':'›'}</div>
-      </div>
-      ${aperto?`<div style="padding:4px 4px 12px 29px;font-size:0.68rem;color:var(--muted);line-height:1.6">
-        <div style="color:var(--cream);margin-bottom:4px">Perché con il ${pesce.nome.toLowerCase()}:</div>
-        ${motivi.length?motivi.map(m=>'• '+m).join('<br>'):'nessuna forte complementarità funzionale'}
-        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px">
-          <span>pH ${i.ph}</span><span>grasso ${i.gr}%</span><span>umami ${i.um}/5</span><span>dolce ${i.dol}/5</span>
-        </div>
-        <div style="margin-top:6px">${comune}</div>
-        ${triSuoi.length?`<div style="margin-top:8px;color:var(--gold)">🔺 ${triSuoi.map(t=>t[0]).join(' · ')}</div>`:''}
-      </div>`:''}
-    </div>`;
-  }).join('');
+    const on=pmScelti.includes(i.nome);
+    return `<button onclick="pmTocca('${i.nome.replace(/'/g,"\\'")}')"
+      style="border:1px solid ${on?col:'var(--border)'};background:${on?col+'22':'transparent'};color:${on?'#fff':'var(--cream)'};border-radius:999px;padding:6px 10px;font-size:0.74rem;cursor:pointer;display:flex;align-items:center;gap:5px">
+      <span>${i.icona}</span><span>${i.nome}</span>${on?'<span style="opacity:0.7">✕</span>':''}</button>`;
+  }).join('') : '<div style="font-size:0.75rem;color:var(--muted);padding:6px">Nessun ingrediente in questa fascia.</div>';
+
+  pmRenderScelti(pesce);
 }
-function pmTocca(nome){ pmSelezionato = pmSelezionato===nome ? null : nome; pmRender(); }
+
+// Area del piatto: calamaro + ingredienti scelti, con analisi.
+function pmRenderScelti(pesce){
+  const box=document.getElementById('pmScelti');
+  if(!pmScelti.length){ box.innerHTML=''; return; }
+  const ingS=pmScelti.map(n=>PM_INGR.find(x=>x.nome===n)).filter(Boolean);
+
+  let h=`<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card);margin-bottom:6px">
+    <div style="font-size:0.8rem;font-weight:600;margin-bottom:8px">${pesce.icona} ${pesce.nome} +</div>`;
+  ingS.forEach(i=>{
+    const col=PM_COLORI[i.cat]||'var(--muted)';
+    const pct=Math.round(pmFunzionale(pesce,i)*100);
+    const motivi=pmMotivi(pesce,i);
+    h+=`<div style="padding:6px 0;border-top:1px solid rgba(255,255,255,0.06)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span>${i.icona}</span><span style="flex:1;font-size:0.8rem">${i.nome}</span>
+        <span style="font-size:0.7rem;color:${col}">affinità ${pct}</span>
+      </div>
+      ${motivi.length?`<div style="font-size:0.64rem;color:var(--muted);margin-left:22px;line-height:1.5">${motivi.join(' · ')}</div>`:''}
+    </div>`;
+  });
+
+  // Rilevamento ponte: se hai scelto 2+ ingredienti, cerca un triangolo curato che li unisca.
+  if(ingS.length>=2){
+    const ponte = pmCercaPonte(ingS.map(i=>i.nome));
+    h+= ponte
+      ? `<div style="margin-top:8px;font-size:0.68rem;color:var(--gold);line-height:1.5;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px">🔺 Ponte trovato: <b>${ponte[1]}</b><br><span style="color:var(--muted)">${ponte[2]}</span></div>`
+      : `<div style="margin-top:8px;font-size:0.66rem;color:var(--muted);line-height:1.5;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px">Nessun triangolo noto per questa coppia. Il ponte automatico arriverà con i dati molecolari degli ingredienti.</div>`;
+  }
+  h+=`<button class="btn btn-o" style="margin-top:10px;font-size:0.72rem;padding:7px" onclick="pmSvuota()">Svuota selezione</button></div>`;
+  box.innerHTML=h;
+}
+
+// Cerca fra i triangoli curati uno che contenga entrambi gli ingredienti scelti.
+function pmCercaPonte(nomi){
+  const chiavi=nomi.map(n=>n.toLowerCase().split(' ')[0]);
+  return PM_TRIANGOLI.find(t=>{
+    const testo=t[0].toLowerCase();
+    return chiavi.filter(k=>testo.includes(k)).length>=2;
+  });
+}
+
+function pmTocca(nome){
+  const idx=pmScelti.indexOf(nome);
+  if(idx>=0) pmScelti.splice(idx,1); else pmScelti.push(nome);
+  pmRender();
+}
+function pmSvuota(){ pmScelti=[]; pmRender(); }
 function pmRenderTriangoli(){
   const box=document.getElementById('pmTriangoli'); if(!box) return;
   box.innerHTML=PM_TRIANGOLI.map(t=>
