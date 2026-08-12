@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v10.2</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v10.3</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -746,6 +746,18 @@ textarea{resize:vertical;min-height:65px}
 
 <!-- ═══════════════════════════════ BILANCIAMENTO ═══════════════════════════════ -->
 <section class="sec" id="bilanc">
+
+  <!-- MATRICE ABBINAMENTI -->
+  <div class="card">
+    <div class="card-t">🧭 Matrice abbinamenti</div>
+    <div style="font-size:0.72rem;color:var(--muted);line-height:1.5;margin-bottom:8px">
+      Scegli un ingrediente e vedi cosa gli si abbina, ordinato per affinità. Tocca una riga per esplorare.
+    </div>
+    <input type="text" id="fmSearch" placeholder="cerca: tonno, limone, pomodoro..." oninput="fmCerca()" autocomplete="off">
+    <div id="fmResults" style="margin-top:6px"></div>
+    <div id="fmBack" style="margin-top:8px"></div>
+    <div id="fmView"></div>
+  </div>
 
   <!-- MAPPA -->
   <div class="card">
@@ -3003,6 +3015,61 @@ function initApp(){
 
 // Catalogo di partenza. ph: intervallo FDA (null se non pertinente o assente).
 // a/r/u/am = acidita percepita, ricchezza, umami, amaro (0-5). cal:false = da calibrare.
+// ═══════════════════════════════════════════════════════
+// MATRICE ABBINAMENTI (dati illustrativi — da sostituire con la ricerca reale)
+// ═══════════════════════════════════════════════════════
+const FM_FAMIGLIE = {
+  agrumi:'#d98a2b', erbe:'#4a9d5b', grassi:'#c9a84c',
+  fermentati:'#8a6fb0', vegetali:'#2a9d8f', frutta:'#d05c6a', ittici:'#3a86c8'
+};
+const FM_DATI = {
+  tonno: [['soia','fermentati',90],['limone','agrumi',88],['sesamo','grassi',80],['zenzero','erbe',75],['lime','agrumi',72],['avocado','grassi',70],['wasabi','erbe',68],['scalogno','vegetali',60],['colatura','fermentati',58],['pomodoro','vegetali',55]],
+  limone: [['tonno','ittici',88],['olio evo','grassi',82],['gambero','ittici',80],['prezzemolo','erbe',78],['burro','grassi',72],['finocchio','vegetali',70],['aglio','vegetali',66]],
+  pomodoro: [['basilico','erbe',92],['mozzarella','grassi',88],['olio evo','grassi',80],['acciuga','fermentati',76],['origano','erbe',74],['oliva','fermentati',72],['aglio','vegetali',70],['tonno','ittici',55]],
+  soia: [['tonno','ittici',90],['sesamo','grassi',82],['zenzero','erbe',78],['scalogno','vegetali',62],['aglio','vegetali',60],['miele','frutta',58]],
+  gambero: [['limone','agrumi',80],['aglio','vegetali',72],['prezzemolo','erbe',70],['burro','grassi',68],['zenzero','erbe',64]],
+  basilico: [['pomodoro','vegetali',92],['mozzarella','grassi',78],['olio evo','grassi',76],['pinoli','grassi',70],['aglio','vegetali',66]],
+};
+let _fmCentro = null, _fmStoria = [];
+
+function fmCerca(){
+  const q=(document.getElementById('fmSearch').value||'').toLowerCase().trim();
+  const box=document.getElementById('fmResults');
+  if(!q){ box.innerHTML=''; return; }
+  const res=Object.keys(FM_DATI).filter(n=>n.includes(q)).slice(0,8);
+  box.innerHTML = res.length ? res.map(n=>
+    `<button class="btn btn-o" style="font-size:0.78rem;padding:7px;margin-bottom:5px;text-align:left" onclick="fmVai('${n}')">${n}</button>`).join('')
+    : '<div style="font-size:0.72rem;color:var(--muted);padding:6px">Nessun ingrediente in matrice. Lo aggiungeremo con la ricerca.</div>';
+}
+function fmVai(n){
+  if(!FM_DATI[n]) return;
+  if(_fmCentro && _fmCentro!==n) _fmStoria.push(_fmCentro);
+  _fmCentro=n;
+  document.getElementById('fmSearch').value=''; document.getElementById('fmResults').innerHTML='';
+  fmRender();
+}
+function fmIndietro(){ if(_fmStoria.length){ _fmCentro=_fmStoria.pop(); fmRender(); } }
+function fmRender(){
+  const back=document.getElementById('fmBack'), view=document.getElementById('fmView');
+  if(!_fmCentro){ back.innerHTML=''; view.innerHTML=''; return; }
+  back.innerHTML = _fmStoria.length
+    ? `<span style="font-size:0.75rem;color:var(--teal-l);cursor:pointer" onclick="fmIndietro()">‹ ${_fmStoria[_fmStoria.length-1]}</span>` : '';
+  const dati=[...FM_DATI[_fmCentro]].sort((a,b)=>b[2]-a[2]);
+  let h=`<div style="font-size:1.05rem;font-weight:600;margin:8px 0 2px">${_fmCentro}</div>
+    <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px">${dati.length} abbinamenti · tocca per esplorare</div>`;
+  h+=dati.map(d=>{
+    const col=FM_FAMIGLIE[d[1]]||'var(--muted)';
+    const nav=FM_DATI[d[0]];
+    return `<div onclick="${nav?`fmVai('${d[0]}')`:''}" style="display:flex;align-items:center;gap:9px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,0.06);${nav?'cursor:pointer':''}">
+      <div style="width:96px;flex-shrink:0"><div style="font-size:0.82rem">${d[0]}</div><div style="font-size:0.6rem;color:var(--muted)">${d[1]}</div></div>
+      <div style="flex:1;height:13px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden"><div style="width:${d[2]}%;height:100%;background:${col};border-radius:999px"></div></div>
+      <div style="width:24px;text-align:right;font-size:0.72rem;color:var(--muted)">${d[2]}</div>
+      <div style="width:12px;color:var(--muted);font-size:0.85rem">${nav?'›':''}</div>
+    </div>`;
+  }).join('');
+  view.innerHTML=h;
+}
+
 const BILANC_SEED = [
   ['base','tonno',        '5,9-6,2', 0,4,3,0],
   ['base','pesce spada',  '5,3-6,9', 0,3,2,0],
