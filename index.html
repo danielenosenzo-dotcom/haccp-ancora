@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v10.4</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v10.5</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3110,6 +3110,7 @@ function pmMotivi(p, ing){
 }
 
 let pmInizializzato=false;
+let pmSelezionato=null;
 function pmInit(){
   const sel=document.getElementById('pmPesce');
   if(sel && !pmInizializzato){
@@ -3138,19 +3139,32 @@ function pmRender(){
     const col=PM_COLORI[i.cat]||'var(--muted)';
     const pct=Math.round(i.score*100);
     const motivi=pmMotivi(pesce,i);
-    return `<div style="padding:8px 2px;border-bottom:1px solid rgba(255,255,255,0.06)">
-      <div style="display:flex;align-items:center;gap:9px">
+    const aperto = pmSelezionato===i.nome;
+    const comune = i.cooc>=0.50?'abbinamento tradizionale':i.cooc>=0.20?'poco comune':'raro, quasi mai visto';
+    const triSuoi = PM_TRIANGOLI.filter(t=>t[0].toLowerCase().includes(i.nome.toLowerCase().split(' ')[0]));
+    return `<div style="border-bottom:1px solid rgba(255,255,255,0.06)">
+      <div onclick="pmTocca('${i.nome.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:9px;padding:8px 2px;cursor:pointer;${aperto?'background:rgba(14,124,123,0.08)':''}">
         <div style="width:20px;text-align:center">${i.icona}</div>
         <div style="flex:1;min-width:0"><div style="font-size:0.82rem">${i.nome}</div>
           <div style="font-size:0.6rem;color:${col}">${i.cat}</div></div>
-        <div style="flex:1;height:12px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;max-width:110px">
+        <div style="flex:1;height:12px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;max-width:100px">
           <div style="width:${pct}%;height:100%;background:${col};border-radius:999px"></div></div>
-        <div style="width:30px;text-align:right;font-size:0.7rem;color:var(--muted)">${pct}</div>
+        <div style="width:28px;text-align:right;font-size:0.7rem;color:var(--muted)">${pct}</div>
+        <div style="width:12px;color:var(--muted);font-size:0.8rem">${aperto?'▾':'›'}</div>
       </div>
-      ${motivi.length?`<div style="font-size:0.62rem;color:var(--muted);margin-left:29px;margin-top:2px">${motivi.join(' · ')}</div>`:''}
+      ${aperto?`<div style="padding:4px 4px 12px 29px;font-size:0.68rem;color:var(--muted);line-height:1.6">
+        <div style="color:var(--cream);margin-bottom:4px">Perché con il ${pesce.nome.toLowerCase()}:</div>
+        ${motivi.length?motivi.map(m=>'• '+m).join('<br>'):'nessuna forte complementarità funzionale'}
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px">
+          <span>pH ${i.ph}</span><span>grasso ${i.gr}%</span><span>umami ${i.um}/5</span><span>dolce ${i.dol}/5</span>
+        </div>
+        <div style="margin-top:6px">${comune}</div>
+        ${triSuoi.length?`<div style="margin-top:8px;color:var(--gold)">🔺 ${triSuoi.map(t=>t[0]).join(' · ')}</div>`:''}
+      </div>`:''}
     </div>`;
   }).join('');
 }
+function pmTocca(nome){ pmSelezionato = pmSelezionato===nome ? null : nome; pmRender(); }
 function pmRenderTriangoli(){
   const box=document.getElementById('pmTriangoli'); if(!box) return;
   box.innerHTML=PM_TRIANGOLI.map(t=>
