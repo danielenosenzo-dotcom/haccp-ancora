@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v10.6</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v10.7</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -747,31 +747,18 @@ textarea{resize:vertical;min-height:65px}
 <!-- ═══════════════════════════════ BILANCIAMENTO ═══════════════════════════════ -->
 <section class="sec" id="bilanc">
 
-  <!-- PESCE MATRIX — MOTORE ABBINAMENTI -->
+  <!-- MATRICE SENSORIALE — food bridging su dati reali FlavorDB2 -->
   <div class="card">
-    <div class="card-t">🦑 Pesce Matrix</div>
-    <label>Pesce</label>
-    <select id="pmPesce" onchange="pmRender()"></select>
-    <label style="margin-top:10px;display:flex;justify-content:space-between">
-      <span>Audacia</span><span id="pmAudaciaLbl" style="color:var(--gold)"></span>
-    </label>
-    <input type="range" id="pmAudacia" min="0" max="2" value="0" step="1" oninput="pmRender()" style="width:100%">
-    <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--muted);margin-top:-2px">
-      <span>tradizione</span><span>creativo</span><span>audace</span>
-    </div>
-    <div id="pmInfoPesce" style="font-size:0.68rem;color:var(--muted);line-height:1.5;margin:10px 0"></div>
-    <div id="pmScelti"></div>
-    <div style="font-size:0.66rem;color:var(--muted);margin:8px 0 4px">Tocca gli ingredienti da abbinare:</div>
-    <div id="pmList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-  </div>
+    <div class="card-t">🧬 Matrice Sensoriale</div>
+    <div id="msStato" style="font-size:0.7rem;color:var(--muted);line-height:1.5;margin-bottom:8px">Caricamento dati molecolari...</div>
 
-  <!-- TRIANGOLI MOLECOLARI -->
-  <div class="card">
-    <div class="card-t">🔺 Triangoli molecolari</div>
-    <div style="font-size:0.72rem;color:var(--muted);line-height:1.5;margin-bottom:8px">
-      Due ingredienti che non si abbinano direttamente, uniti da un terzo che fa da ponte (food bridging).
+    <div id="msPasso1">
+      <div style="font-size:0.72rem;color:var(--cream);margin-bottom:6px">1 · Parti da un ingrediente</div>
+      <div id="msGriglia" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
-    <div id="pmTriangoli"></div>
+
+    <div id="msPasso2" style="display:none"></div>
+    <div id="msPasso3" style="display:none"></div>
   </div>
 
   <!-- MAPPA -->
@@ -3028,183 +3015,85 @@ function initApp(){
 // pH = dato oggettivo (tabella FDA). Palato = calibrato dall'utente.
 // ═══════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════
+// MATRICE SENSORIALE — food bridging su dati reali FlavorDB2
+// Dati precalcolati offline (Jaccard + molecole ponte) in matrice-dati.json.
+// Fonte: FlavorDB2 (CC BY-NC-SA). Metrica: indice di Jaccard (NON conteggio grezzo).
+// ═══════════════════════════════════════════════════════
+let MS=null, msA=null, msB=null;
+
+async function msInit(){
+  const stato=document.getElementById('msStato');
+  if(MS){ msReset(); return; }
+  try{
+    const r=await fetch('matrice-dati.json?v=1');
+    MS=await r.json();
+    stato.textContent='Scegli un ingrediente: l’app trova gli abbinamenti per molecole condivise, poi il terzo elemento che fa da ponte.';
+    msRenderGriglia();
+  }catch(e){ if(stato) stato.textContent='⚠️ Dati molecolari non caricati: '+(e.message||e); }
+}
+function msIng(id){ return MS.ingredienti.find(x=>x.id===id); }
+function msCoppia(a,b){ return MS.coppie[a+'-'+b] || MS.coppie[b+'-'+a] || {j:0,c:0,m:[]}; }
+
+function msRenderGriglia(){
+  const box=document.getElementById('msGriglia');
+  box.innerHTML=MS.ingredienti.map(i=>{
+    const on=msA===i.id;
+    return '<button onclick="msScegliA('+i.id+')" style="border:1px solid '+(on?'var(--teal-l)':'var(--border)')+';background:'+(on?'rgba(14,124,123,0.2)':'transparent')+';color:var(--cream);border-radius:999px;padding:6px 10px;font-size:0.74rem;cursor:pointer;display:flex;align-items:center;gap:5px"><span>'+i.icona+'</span>'+i.nome+'</button>';
+  }).join('');
+}
+function msReset(){ msA=null; msB=null; document.getElementById('msPasso2').style.display='none'; document.getElementById('msPasso3').style.display='none'; msRenderGriglia(); }
+
+function msScegliA(id){
+  msA=id; msB=null;
+  document.getElementById('msPasso3').style.display='none';
+  msRenderGriglia();
+  msRenderPasso2();
+}
+function msRenderPasso2(){
+  const A=msIng(msA);
+  const rank=MS.ingredienti.filter(i=>i.id!==msA)
+    .map(i=>({i, j:msCoppia(msA,i.id).j})).sort((x,y)=>y.j-x.j);
+  const p2=document.getElementById('msPasso2');
+  p2.style.display='block';
+  p2.innerHTML='<div style="font-size:0.72rem;color:var(--cream);margin:14px 0 6px">2 · Abbinamenti di '+A.icona+' '+A.nome+' <span style="color:var(--muted)">(per molecole condivise)</span></div>'
+    + rank.map(r=>{
+      const pct=Math.round(r.j*100), on=msB===r.i.id;
+      return '<div onclick="msScegliB('+r.i.id+')" style="display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;'+(on?'background:rgba(14,124,123,0.08)':'')+'">'
+        +'<div style="width:20px;text-align:center">'+r.i.icona+'</div>'
+        +'<div style="flex:1;font-size:0.8rem">'+r.i.nome+'</div>'
+        +'<div style="flex:1;height:11px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;max-width:120px"><div style="width:'+pct+'%;height:100%;background:var(--teal-l);border-radius:999px"></div></div>'
+        +'<div style="width:30px;text-align:right;font-size:0.7rem;color:var(--muted)">'+pct+'</div>'
+        +'<div style="width:12px;color:var(--muted)">'+(on?'▾':'›')+'</div></div>';
+    }).join('');
+}
+
+function msScegliB(id){
+  msB=id; msRenderPasso2();
+  const A=msIng(msA), B=msIng(id), cp=msCoppia(msA,id);
+  const terzi=MS.ingredienti.filter(i=>i.id!==msA&&i.id!==id)
+    .map(i=>({i, jA:msCoppia(msA,i.id).j, jB:msCoppia(id,i.id).j}))
+    .map(t=>({...t, forza:Math.min(t.jA,t.jB)}))
+    .sort((x,y)=>y.forza-x.forza).slice(0,4);
+  const p3=document.getElementById('msPasso3');
+  p3.style.display='block';
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">3 · Il ponte tra '+A.icona+' '+A.nome+' e '+B.icona+' '+B.nome+'</div>';
+  h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;font-size:0.78rem;margin-bottom:8px"><span>'+A.icona+' '+A.nome+'</span><span style="color:var(--teal-l);font-weight:600">'+cp.c+' molecole</span><span>'+B.icona+' '+B.nome+'</span></div>';
+  h+= cp.m.length ? cp.m.map(m=>'<div style="padding:5px 0;border-top:1px solid rgba(255,255,255,0.06)"><div style="font-size:0.74rem">'+m.n+'</div><div style="font-size:0.64rem;color:var(--teal-l)">'+m.p+'</div></div>').join('')
+    : '<div style="font-size:0.7rem;color:var(--muted)">Nessuna molecola condivisa diretta: serve un ponte, qui sotto.</div>';
+  h+='</div>';
+  h+='<div style="font-size:0.68rem;color:var(--gold);margin:12px 0 6px">🔺 Terzo elemento che lega entrambi</div>';
+  h+=terzi.map(t=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,0.06)"><span>'+t.i.icona+'</span><span style="flex:1;font-size:0.78rem">'+t.i.nome+'</span><span style="font-size:0.62rem;color:var(--muted)">'+A.nome+' '+Math.round(t.jA*100)+' · '+B.nome+' '+Math.round(t.jB*100)+'</span></div>').join('');
+  h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:10px">dati reali FlavorDB2 (CC BY-NC-SA) · affinità = indice di Jaccard</div>';
+  h+='<button class="btn btn-o" style="margin-top:10px;font-size:0.72rem;padding:7px" onclick="msReset()">Ricomincia</button>';
+  p3.innerHTML=h;
+  p3.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+
 // Catalogo di partenza. ph: intervallo FDA (null se non pertinente o assente).
 // a/r/u/am = acidita percepita, ricchezza, umami, amaro (0-5). cal:false = da calibrare.
-// ═══════════════════════════════════════════════════════
-// PESCE MATRIX — motore abbinamenti molecolare (base: file Kimi)
-// Watson = 40% molecolare + 35% funzionale + 25% co-occorrenza.
-// Il 40% molecolare richiede i composti di ogni ingrediente: non ancora
-// disponibili, quindi ora il punteggio usa funzionale + co-occorrenza.
-// ═══════════════════════════════════════════════════════
-const PM_COLORI = {
-  acido:'#d98a2b', dolce:'#d05c6a', aromatico:'#4a9d5b', grasso:'#c9a84c',
-  amaro:'#6b7a86', piccante:'#e05c5c', spezia:'#b0703a', umami:'#8a6fb0'
-};
-// [nome, icona, categoria, pH, grasso%, umami, dolcezza, co-occorrenza]
-const PM_INGR = [
-  ['Limone','🍋','acido',2.4,0,0,1,0.95],['Pomodoro','🍅','acido',4.3,0.2,3,2,0.88],
-  ['Cocco','🥥','dolce',5.5,33,0,3,0.15],['Prezzemolo','🌿','aromatico',6.0,0.8,1,0,0.82],
-  ['Burro','🧈','grasso',6.1,81,1,1,0.65],['Yuzu','🍊','acido',3.0,0,0,2,0.25],
-  ['Mango','🥭','dolce',3.9,0.4,0,5,0.20],['Alghe nori','🌊','aromatico',6.5,1.0,5,0,0.30],
-  ['Cioccolato bianco','🍫','dolce',5.8,35,0,4,0.05],['Caffè espresso','☕','amaro',5.0,0.1,2,0,0.08],
-  ['Pepe di Sichuan','🔴','piccante',6.8,2.0,1,1,0.12],['Cardamomo','🟤','spezia',6.5,7.0,0,2,0.10],
-  ['Miso bianco','🟡','umami',5.2,3.0,5,2,0.18],['Finocchio','🌿','aromatico',6.3,0.2,0,1,0.35],
-  ['Cipolla caramellata','🧅','dolce',5.5,0.3,1,4,0.55],['Aglio','🧄','aromatico',5.8,0.5,1,0,0.78],
-  ['Olio EVO','🫒','grasso',6.5,100,0,0,0.90],['Basilico','🌿','aromatico',6.2,0.6,0,1,0.72],
-  ['Peperoncino','🌶️','piccante',5.0,0.4,0,1,0.68],['Zenzero','🫚','spezia',5.6,0.8,0,1,0.22],
-  ['Miele','🍯','dolce',3.9,0,0,5,0.30],['Aceto balsamico','🍇','acido',3.0,0,1,3,0.42],
-  ['Tartufo nero','⚫','aromatico',6.8,0.5,3,0,0.15],['Parmigiano','🧀','umami',5.4,28,5,1,0.38],
-  ['Panna','🥛','grasso',6.5,35,1,2,0.48],['Caviale','⚫','umami',5.8,18,5,0,0.25],
-  ['Fiori di sambuco','🌸','aromatico',6.0,0,0,2,0.08],['Rafano','⚪','piccante',5.5,0.3,0,1,0.12],
-  ['Porro','🥬','aromatico',5.8,0.2,1,2,0.45],['Noci','🌰','grasso',6.0,65,1,1,0.28],
-  ['Pompelmo','🍊','acido',3.0,0.1,0,2,0.18],['Curcuma','🟡','spezia',6.8,3.0,0,0,0.10],
-  ['Sesamo tostato','⚪','grasso',6.5,50,1,0,0.15],['Funghi porcini','🍄','umami',6.2,0.5,4,1,0.20],
-  ['Anice stellato','⭐','spezia',6.5,8.0,0,3,0.08],['Arance candite','🍊','dolce',4.5,0,0,5,0.05],
-  ['Pistacchio','🟢','grasso',6.0,45,1,1,0.12],['Wasabi','🟢','piccante',6.0,0.5,1,0,0.18],
-  ['Capperi','🫒','acido',4.5,0.9,2,0,0.52],['Olive taggiasche','⚫','grasso',6.0,25,2,0,0.48],
-  ['Finocchietto selvatico','🌿','aromatico',6.3,0.3,0,1,0.35],['Bottarga','🟠','umami',5.8,25,5,0,0.55],
-  ['Arancia rossa','🍊','acido',3.5,0.1,0,3,0.22],['Menta','🍃','aromatico',6.5,0.6,0,1,0.25],
-  ['Cannella','🟤','spezia',6.0,1.2,0,3,0.08],['Caviale di limone','🍋','acido',2.8,0,0,1,0.05],
-  ['Polvere di olive','⚫','umami',6.0,20,4,0,0.08],
-].map(a=>({nome:a[0],icona:a[1],cat:a[2],ph:a[3],gr:a[4],um:a[5],dol:a[6],cooc:a[7]}));
-
-const PM_PESCI = {
-  calamaro: { nome:'Calamaro patagonico', icona:'🦑', ph:6.35, grasso:1.2, umamiCotto:4,
-    dolcezza:2, texture:'gommosa', tecnica:'griglia o piastra, alta temperatura, 2-3 minuti' },
-};
-
-// Triangoli food-bridging (curati, dal file Kimi)
-const PM_TRIANGOLI = [
-  ['Pomodoro + Cocco + Capesante','Pomodoro','Cocco e capesante non hanno ponte diretto: il pomodoro li lega — gamma-octalattone col cocco, glutammato con la capesante.'],
-  ['Fragole + Funghi + Pollo','Funghi','Fragole e pollo non condividono nulla: i funghi fanno da ponte — (Z)-3-esenale con le fragole, glutammato e metionale col pollo.'],
-  ['Caffè + Carote + Cacao','Cacao','Il cacao unisce caffè e carote via pirazine (tostato) e beta-ionone (floreale) in tracce.'],
-  ['Miso + Burro + Caffè','Burro','Miso e caffè non si legano: il burro fa da ponte col diacetile (burro, caramello).'],
-  ['Pomodoro + Basilico + Mozzarella','Pomodoro','Triangolo simmetrico: (Z)-3-esenale e linalolo, lattoni cremosi, glutammato.'],
-  ['Tartufo + Vaniglia + Uovo','Uovo','Dimetil-solfuro lega tartufo e vaniglia; lattoni e metionale portano all\'uovo.'],
-  ['Caramello + Salsa di pesce + Zenzero','Zenzero','Furaneolo col caramello, glutammato con la salsa di pesce, gingerolo comune.'],
-  ['Cioccolato bianco + Caviale + Champagne','Cioccolato bianco','Trimetilammina lega cioccolato e caviale; lattoni verso lo champagne.'],
-  ['Asparagi + Cocco + Lime','Cocco','Esanale e gamma-octalattone con gli asparagi, limonene e lattone col lime.'],
-  ['Arancia + Olio d\'oliva + Pepe nero','Olio d\'oliva','Limonene lega arancia e olio; piperina e oleico verso il pepe nero.'],
-];
-
-const PM_BANDE = [
-  { min:0.50, lbl:'tradizione' },
-  { min:0.20, lbl:'creativo'  },
-  { min:0,    lbl:'audace'    },
-];
-
-// Complementarità funzionale (0..1) — regole dal file Kimi.
-function pmFunzionale(p, ing){
-  let s=0;
-  const dph = Math.abs(p.ph - ing.ph);
-  if(dph>2) s+=2; else if(dph>1) s+=1;          // acido taglia il grasso
-  if(p.umamiCotto>=3 && ing.um>=3) s+=1;         // umami su umami
-  if(p.grasso<10 && ing.gr>10) s+=1;             // grasso ammorbidisce il magro
-  return s/4;
-}
-function pmMotivi(p, ing){
-  const m=[];
-  const dph=Math.abs(p.ph-ing.ph);
-  if(dph>1 && ing.ph<p.ph) m.push('acidità che sgrassa e ravviva');
-  if(p.umamiCotto>=3 && ing.um>=3) m.push('umami su umami: sapidità piena');
-  if(p.grasso<10 && ing.gr>10) m.push('grasso che ammorbidisce il calamaro magro');
-  return m;
-}
-
-let pmInizializzato=false;
-let pmScelti=[];
-function pmInit(){
-  const sel=document.getElementById('pmPesce');
-  if(sel && !pmInizializzato){
-    sel.innerHTML=Object.keys(PM_PESCI).map(k=>`<option value="${k}">${PM_PESCI[k].icona} ${PM_PESCI[k].nome}</option>`).join('');
-    pmInizializzato=true;
-  }
-  pmRenderTriangoli();
-  pmRender();
-}
-function pmRender(){
-  const pesce=PM_PESCI[document.getElementById('pmPesce').value] || PM_PESCI.calamaro;
-  const banda=PM_BANDE[parseInt(document.getElementById('pmAudacia').value)||0];
-  document.getElementById('pmAudaciaLbl').textContent=banda.lbl;
-  const maxCooc = banda.lbl==='tradizione' ? 1.01 : PM_BANDE[PM_BANDE.indexOf(banda)-1].min;
-  document.getElementById('pmInfoPesce').innerHTML=
-    `pH ${pesce.ph} · magro (${pesce.grasso}%) · umami da cotto ${pesce.umamiCotto}/5 · ${pesce.texture}<br>${pesce.tecnica}`;
-
-  // Griglia: ingredienti della fascia audacia scelta, ordinati per affinità.
-  const lista=PM_INGR
-    .filter(i => i.cooc>=banda.min && i.cooc<maxCooc)
-    .map(i => ({...i, score:pmFunzionale(pesce,i)}))
-    .sort((a,b)=> b.score-a.score || b.cooc-a.cooc);
-
-  const box=document.getElementById('pmList');
-  box.innerHTML = lista.length ? lista.map(i=>{
-    const col=PM_COLORI[i.cat]||'var(--muted)';
-    const on=pmScelti.includes(i.nome);
-    return `<button onclick="pmTocca('${i.nome.replace(/'/g,"\\'")}')"
-      style="border:1px solid ${on?col:'var(--border)'};background:${on?col+'22':'transparent'};color:${on?'#fff':'var(--cream)'};border-radius:999px;padding:6px 10px;font-size:0.74rem;cursor:pointer;display:flex;align-items:center;gap:5px">
-      <span>${i.icona}</span><span>${i.nome}</span>${on?'<span style="opacity:0.7">✕</span>':''}</button>`;
-  }).join('') : '<div style="font-size:0.75rem;color:var(--muted);padding:6px">Nessun ingrediente in questa fascia.</div>';
-
-  pmRenderScelti(pesce);
-}
-
-// Area del piatto: calamaro + ingredienti scelti, con analisi.
-function pmRenderScelti(pesce){
-  const box=document.getElementById('pmScelti');
-  if(!pmScelti.length){ box.innerHTML=''; return; }
-  const ingS=pmScelti.map(n=>PM_INGR.find(x=>x.nome===n)).filter(Boolean);
-
-  let h=`<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card);margin-bottom:6px">
-    <div style="font-size:0.8rem;font-weight:600;margin-bottom:8px">${pesce.icona} ${pesce.nome} +</div>`;
-  ingS.forEach(i=>{
-    const col=PM_COLORI[i.cat]||'var(--muted)';
-    const pct=Math.round(pmFunzionale(pesce,i)*100);
-    const motivi=pmMotivi(pesce,i);
-    h+=`<div style="padding:6px 0;border-top:1px solid rgba(255,255,255,0.06)">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span>${i.icona}</span><span style="flex:1;font-size:0.8rem">${i.nome}</span>
-        <span style="font-size:0.7rem;color:${col}">affinità ${pct}</span>
-      </div>
-      ${motivi.length?`<div style="font-size:0.64rem;color:var(--muted);margin-left:22px;line-height:1.5">${motivi.join(' · ')}</div>`:''}
-    </div>`;
-  });
-
-  // Rilevamento ponte: se hai scelto 2+ ingredienti, cerca un triangolo curato che li unisca.
-  if(ingS.length>=2){
-    const ponte = pmCercaPonte(ingS.map(i=>i.nome));
-    h+= ponte
-      ? `<div style="margin-top:8px;font-size:0.68rem;color:var(--gold);line-height:1.5;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px">🔺 Ponte trovato: <b>${ponte[1]}</b><br><span style="color:var(--muted)">${ponte[2]}</span></div>`
-      : `<div style="margin-top:8px;font-size:0.66rem;color:var(--muted);line-height:1.5;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px">Nessun triangolo noto per questa coppia. Il ponte automatico arriverà con i dati molecolari degli ingredienti.</div>`;
-  }
-  h+=`<button class="btn btn-o" style="margin-top:10px;font-size:0.72rem;padding:7px" onclick="pmSvuota()">Svuota selezione</button></div>`;
-  box.innerHTML=h;
-}
-
-// Cerca fra i triangoli curati uno che contenga entrambi gli ingredienti scelti.
-function pmCercaPonte(nomi){
-  const chiavi=nomi.map(n=>n.toLowerCase().split(' ')[0]);
-  return PM_TRIANGOLI.find(t=>{
-    const testo=t[0].toLowerCase();
-    return chiavi.filter(k=>testo.includes(k)).length>=2;
-  });
-}
-
-function pmTocca(nome){
-  const idx=pmScelti.indexOf(nome);
-  if(idx>=0) pmScelti.splice(idx,1); else pmScelti.push(nome);
-  pmRender();
-}
-function pmSvuota(){ pmScelti=[]; pmRender(); }
-function pmRenderTriangoli(){
-  const box=document.getElementById('pmTriangoli'); if(!box) return;
-  box.innerHTML=PM_TRIANGOLI.map(t=>
-    `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
-      <div style="font-size:0.8rem;font-weight:600">${t[0]}</div>
-      <div style="font-size:0.66rem;color:var(--gold);margin:2px 0">ponte: ${t[1]}</div>
-      <div style="font-size:0.68rem;color:var(--muted);line-height:1.5">${t[2]}</div>
-    </div>`).join('');
-}
-
 const BILANC_SEED = [
   ['base','tonno',        '5,9-6,2', 0,4,3,0],
   ['base','pesce spada',  '5,3-6,9', 0,3,2,0],
@@ -3482,7 +3371,7 @@ function bRenderCatalogo(){
   });
   box.innerHTML=h;
 }
-function bInit(){ pmInit(); bRender(); bRenderCatalogo(); }
+function bInit(){ msInit(); bRender(); bRenderCatalogo(); }
 
 // Elimina automaticamente le scadenze con data passata
 async function eliminaScaduteAuto() {
