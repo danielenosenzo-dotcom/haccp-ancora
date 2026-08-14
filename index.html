@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.2</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.3</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3013,7 +3013,7 @@ function initApp(){
 // Dati precalcolati offline (Jaccard + molecole ponte) in matrice-dati.json.
 // Fonte: FlavorDB2 (CC BY-NC-SA). Metrica: indice di Jaccard (NON conteggio grezzo).
 // ═══════════════════════════════════════════════════════
-let MS=null, msA=null, msB=null, msC=null, msPesce=null;
+let MS=null, msDocCorrente=null, msA=null, msB=null, msC=null, msPesce=null;
 const MS_PESCI=[['Calamaro','🦑'],['Gambero','🦐'],['Tonno','🐟'],['Polpo','🐙'],['Seppia','🦑'],['Acciuga','🐟'],['Branzino','🐟'],['Orata','🐟'],['Ricciola','🐟'],['Scampo','🦞']];
 
 async function msInit(){
@@ -3208,7 +3208,7 @@ function msRenderGusto(){
     if(nota) h+='<div style="font-size:0.68rem;color:var(--teal-l);line-height:1.5;margin-top:10px">'+nota+'</div>';
   }
   h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:10px">dati reali USDA FoodData Central + tabella pH FDA · '+conDati.length+'/3 ingredienti con dato completo</div>';
-  p5.innerHTML='<div style="margin-top:6px">'+h+'</div>';
+  p5.innerHTML='<div style="margin-top:6px">'+h+'</div>'+msSuggerisci();
 
   const sv=document.getElementById('msSalva');
   sv.style.display='block';
@@ -3243,6 +3243,82 @@ async function msSalvaPiatto(){
   }catch(e){ alert('Errore nel salvataggio: '+(e.message||e)); }
 }
 
+// Suggerisce il quarto elemento: deve legarsi ai tre per aroma (Jaccard minimo alto)
+// E colmare il buco del gusto (acidità, grasso o umami mancanti).
+function msSuggerisci(){
+  const trio=[msA,msB,msC].map(id=>msIng(id));
+  const conD=trio.filter(i=>i.gusto&&i.gusto.fonteUSDA);
+
+  // Cosa manca, sui dati reali disponibili
+  const phMin = Math.min(...conD.filter(i=>i.gusto.ph!=null).map(i=>i.gusto.ph), 99);
+  const grTot = conD.reduce((s,i)=>s+(i.gusto.grasso||0),0);
+  const gluTot= conD.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
+  const buchi=[];
+  if(phMin>4.6) buchi.push({k:'acido', txt:'manca una componente acida che tagli'});
+  if(grTot<3)   buchi.push({k:'grasso', txt:'manca grasso: il piatto resta magro'});
+  if(gluTot<0.5)buchi.push({k:'umami', txt:'poco umami: rischia di sapere di poco'});
+
+  const cand=MS.ingredienti.filter(i=>![msA,msB,msC].includes(i.id)).map(i=>{
+    const js=trio.map(t=>msCoppia(t.id,i.id).j);
+    const legame=Math.min(...js);            // deve legarsi al PIU DEBOLE dei tre
+    const g=i.gusto||{};
+    let colma=null;
+    if(g.fonteUSDA){
+      if(buchi.some(b=>b.k==='acido')  && g.ph!=null && g.ph<4.0) colma='porta acidità (pH '+g.ph+')';
+      else if(buchi.some(b=>b.k==='grasso') && (g.grasso||0)>5)   colma='porta grasso ('+g.grasso+'g)';
+      else if(buchi.some(b=>b.k==='umami')  && (g.glutammato_g||0)>0.3) colma='porta umami ('+g.glutammato_g+'g glutammato)';
+    }
+    return {i, legame, colma};
+  });
+
+  // prima quelli che colmano un buco, poi per forza di legame aromatico
+  const utili=cand.filter(c=>c.colma).sort((a,b)=>b.legame-a.legame).slice(0,3);
+  const soloAroma=cand.filter(c=>!c.colma).sort((a,b)=>b.legame-a.legame).slice(0,2);
+
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">6 · Cosa aggiungerei</div>';
+  h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
+  h+= buchi.length
+    ? '<div style="font-size:0.68rem;color:var(--gold);line-height:1.5;margin-bottom:8px">'+buchi.map(b=>'• '+b.txt).join('<br>')+'</div>'
+    : '<div style="font-size:0.68rem;color:var(--success);margin-bottom:8px">Il trio è già equilibrato sui dati disponibili.</div>';
+
+  const riga=(c,evid)=>'<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,0.06)">'
+    +'<span>'+c.i.icona+'</span><div style="flex:1;min-width:0"><div style="font-size:0.8rem">'+c.i.nome+'</div>'
+    +(c.colma?'<div style="font-size:0.62rem;color:'+(evid?'var(--gold)':'var(--muted)')+'">'+c.colma+'</div>':'')
+    +'</div><span style="font-size:0.66rem;color:var(--teal-l)">lega '+Math.round(c.legame*100)+'</span>'
+    +'<button class="btn btn-o" style="padding:3px 8px;font-size:0.66rem;margin:0" onclick="msScegliC('+c.i.id+')">prova</button></div>';
+
+  if(utili.length){ h+=utili.map(c=>riga(c,true)).join(''); }
+  if(soloAroma.length){
+    h+='<div style="font-size:0.62rem;color:var(--muted);margin-top:9px">più affini per aroma, ma non colmano il buco</div>';
+    h+=soloAroma.map(c=>riga(c,false)).join('');
+  }
+  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:9px">"lega" = affinità col più debole dei tre (Jaccard). Il consiglio usa solo ingredienti con dato gusto reale.</div>';
+  h+='</div>';
+  return h;
+}
+
+// Riapre un piatto salvato: rimette i tre ingredienti e il pesce nello stato di lavoro.
+function msApriPiatto(idsStr, pesce, docId){
+  const ids=idsStr.split(',').map(Number).filter(n=>!isNaN(n));
+  if(ids.length<3){ alert('Piatto incompleto'); return; }
+  msA=ids[0]; msB=ids[1]; msC=ids[2]; msPesce=pesce||null; msDocCorrente=docId||null;
+  msRenderGriglia();
+  msRenderPasso2();
+  msRenderPasso3(false);
+  msRenderPiatto();
+  const n=document.getElementById('msNomePiatto');
+  if(n && docId){ const nome=docId.split('_').slice(1).join('_').replace(/-/g,' '); n.value=nome; }
+}
+
+async function msEliminaPiatto(docId){
+  if(!confirm('Eliminare questo piatto?')) return;
+  try{
+    const fdb=firestoreDb||firebase.firestore();
+    await fdb.collection('piatti').doc(docId).delete();
+    msRenderPiattiSalvati();
+  }catch(e){ alert('Errore: '+(e.message||e)); }
+}
+
 async function msRenderPiattiSalvati(){
   const box=document.getElementById('msPiattiSalvati'); if(!box) return;
   try{
@@ -3251,10 +3327,15 @@ async function msRenderPiattiSalvati(){
     if(snap.empty){ box.innerHTML=''; return; }
     let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">Piatti salvati</div>';
     snap.forEach(d=>{ const p=d.data();
-      h+='<div style="padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06)">'
+      const ids=(p.ingredienti||[]).map(i=>i.id).join(',');
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06)">'
+        +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:0.8rem">'+p.nome+'</div>'
         +'<div style="font-size:0.64rem;color:var(--muted)">'+(p.ingredienti||[]).map(i=>i.icona+' '+i.nome).join(' · ')
-        +(p.pesce?' <span style="color:var(--gold)">+ '+p.pesce+'</span>':'')+' — '+fmtDate(p.data)+'</div></div>';
+        +(p.pesce?' <span style="color:var(--gold)">+ '+p.pesce+'</span>':'')+' — '+fmtDate(p.data)+'</div></div>'
+        +'<button class="btn btn-o" style="padding:4px 9px;font-size:0.68rem;margin:0" onclick="msApriPiatto(\''+ids+'\',\''+(p.pesce||'')+'\',\''+d.id+'\')">apri</button>'
+        +'<button class="btn btn-o" style="padding:4px 8px;font-size:0.68rem;margin:0" onclick="msEliminaPiatto(\''+d.id+'\')">✕</button>'
+        +'</div>';
     });
     box.innerHTML=h;
   }catch(e){ console.warn('piatti:',e); }
