@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.0</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.1</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3147,6 +3147,37 @@ function msRenderGusto(){
 
   const conDati=trio.filter(i=>i.gusto&&i.gusto.fonteUSDA);
   let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">5 · Bilanciamento — gusto molecolare</div>';
+
+  // Mappa del gusto: assi DERIVATI da dati reali, non da stime.
+  //   acidità = (7 - pH) x 2      → il pH viene dalle tabelle FDA
+  //   ricchezza = grasso + zuccheri (g/100g) → da USDA
+  if(conDati.length){
+    const W=300,H=200, MA=10, MR=30;
+    const X=v=>40+Math.min(v,MA)/MA*(W-58);
+    const Y=v=>(H-30)-Math.min(v,MR)/MR*(H-50);
+    const acidoDa=g=>g.ph!=null?Math.max(0,(7-g.ph)*2):null;
+    const ricchDa=g=>(g.grasso||0)+(g.zuccheri||0);
+    let griglia='',punti='';
+    for(let a=2;a<=10;a+=4) griglia+='<line x1="'+X(a)+'" y1="'+Y(0)+'" x2="'+X(a)+'" y2="16" stroke="rgba(255,255,255,0.07)"/><text x="'+X(a)+'" y="'+(Y(0)+13)+'" font-size="8" fill="var(--muted)" text-anchor="middle">'+a+'</text>';
+    for(let r=10;r<=30;r+=10) griglia+='<line x1="'+X(0)+'" y1="'+Y(r)+'" x2="'+(W-14)+'" y2="'+Y(r)+'" stroke="rgba(255,255,255,0.07)"/><text x="'+(X(0)-4)+'" y="'+(Y(r)+3)+'" font-size="8" fill="var(--muted)" text-anchor="end">'+r+'</text>';
+    conDati.forEach((i,k)=>{
+      const a=acidoDa(i.gusto), r=ricchDa(i.gusto);
+      if(a==null) return;
+      const x=X(a), y=Y(r);
+      punti+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="var(--teal-l)" opacity="0.85"/>'
+        +'<text x="'+x+'" y="'+(y+3)+'" text-anchor="middle" font-size="8">'+i.icona+'</text>'
+        +'<text x="'+x+'" y="'+(y+(k%2?18:-11))+'" text-anchor="middle" font-size="8" fill="var(--muted)">'+i.nome+'</text>';
+    });
+    h+='<div style="border:1px solid var(--border);border-radius:12px;padding:9px;background:var(--card);margin-bottom:8px">'
+      +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block">'+griglia
+      +'<line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+(W-14)+'" y2="'+Y(0)+'" stroke="var(--border)"/>'
+      +'<line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+X(0)+'" y2="16" stroke="var(--border)"/>'
+      +'<text x="'+(W-14)+'" y="'+(H-6)+'" font-size="8" fill="var(--muted)" text-anchor="end">acidità (da pH)</text>'
+      +'<text x="'+X(0)+'" y="11" font-size="8" fill="var(--muted)">ricchezza g/100g</text>'
+      +punti+'</svg>'
+      +'<div style="font-size:0.58rem;color:var(--muted);line-height:1.4;margin-top:4px">assi calcolati: acidità = (7 − pH) × 2 · ricchezza = grasso + zuccheri. Posizioni reali, nessuna stima.</div></div>';
+  }
+
   h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
 
   trio.forEach(i=>{
