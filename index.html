@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.1</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.2</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -760,16 +760,8 @@ textarea{resize:vertical;min-height:65px}
     <div id="msPasso2" style="display:none"></div>
     <div id="msPasso3" style="display:none"></div>
     <div id="msPasso4" style="display:none"></div>
-  </div>
-
-  <!-- MAPPA -->
-  <div class="card">
-    <div class="card-t" style="display:flex;align-items:center;justify-content:space-between">
-      <span>🍋 Mappa equilibrio</span>
-      <span id="bMapInfo" style="font-size:0.6rem;color:var(--muted)"></span>
-    </div>
-    <div id="bMapWrap"></div>
-    <div id="bDiag" style="margin-top:10px"></div>
+    <div id="msSalva" style="display:none"></div>
+    <div id="msPiattiSalvati"></div>
   </div>
 
   <!-- COMPOSIZIONE -->
@@ -3033,6 +3025,7 @@ async function msInit(){
     stato.textContent='Prova col carciofo: gli abbinamenti sono per molecole condivise, poi il terzo elemento che fa da ponte. Tocca un altro ingrediente per cambiare.';
     msRenderGriglia();
     if(msIng(157)) msScegliA(157);  // parte dal carciofo
+    msRenderPiattiSalvati();
   }catch(e){ if(stato) stato.textContent='⚠️ Dati molecolari non caricati: '+(e.message||e); }
 }
 function msIng(id){ return MS.ingredienti.find(x=>x.id===id); }
@@ -3045,7 +3038,7 @@ function msRenderGriglia(){
     return '<button onclick="msScegliA('+i.id+')" style="border:1px solid '+(on?'var(--teal-l)':'var(--border)')+';background:'+(on?'rgba(14,124,123,0.2)':'transparent')+';color:var(--cream);border-radius:999px;padding:6px 10px;font-size:0.74rem;cursor:pointer;display:flex;align-items:center;gap:5px"><span>'+i.icona+'</span>'+i.nome+'</button>';
   }).join('');
 }
-function msReset(){ msA=null; msB=null; msC=null; msPesce=null; const p5=document.getElementById('msPasso5'); if(p5) p5.style.display='none'; ['msPasso2','msPasso3','msPasso4'].forEach(x=>document.getElementById(x).style.display='none'); msRenderGriglia(); if(msIng(157)) msScegliA(157); }
+function msReset(){ msA=null; msB=null; msC=null; msPesce=null; const p5=document.getElementById('msPasso5'); if(p5) p5.style.display='none'; const sv0=document.getElementById('msSalva'); if(sv0) sv0.style.display='none'; ['msPasso2','msPasso3','msPasso4'].forEach(x=>document.getElementById(x).style.display='none'); msRenderGriglia(); if(msIng(157)) msScegliA(157); }
 
 function msScegliA(id){
   msA=id; msB=null;
@@ -3075,6 +3068,7 @@ function msScegliB(id){
   msB=id; msC=null;
   document.getElementById('msPasso4').style.display='none';
   const p5=document.getElementById('msPasso5'); if(p5) p5.style.display='none';
+  const sv1=document.getElementById('msSalva'); if(sv1) sv1.style.display='none';
   msRenderPasso2();
   msRenderPasso3(true);
 }
@@ -3215,6 +3209,55 @@ function msRenderGusto(){
   }
   h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:10px">dati reali USDA FoodData Central + tabella pH FDA · '+conDati.length+'/3 ingredienti con dato completo</div>';
   p5.innerHTML='<div style="margin-top:6px">'+h+'</div>';
+
+  const sv=document.getElementById('msSalva');
+  sv.style.display='block';
+  sv.innerHTML='<div style="margin-top:12px"><label>Nome del piatto</label>'
+    +'<input type="text" id="msNomePiatto" placeholder="es. crudo di calamaro, carciofo e limone">'
+    +'<button class="btn btn-g" onclick="msSalvaPiatto()">💾 Salva piatto</button></div>';
+}
+
+// Salva il piatto su Firestore: cosi resta e puo essere riletto altrove.
+async function msSalvaPiatto(){
+  const nome=(document.getElementById('msNomePiatto').value||'').trim();
+  if(!nome){ alert('Dai un nome al piatto'); return; }
+  const trio=[msIng(msA),msIng(msB),msIng(msC)];
+  const rec={
+    nome, data:today(), ora:nowTime(),
+    ingredienti: trio.map(i=>({id:i.id, nome:i.nome, icona:i.icona,
+      gusto: i.gusto&&i.gusto.fonteUSDA ? {ph:i.gusto.ph, grasso:i.gusto.grasso, zuccheri:i.gusto.zuccheri, glutammato:i.gusto.glutammato_g} : null})),
+    pesce: msPesce||null,
+    ponti: [[msA,msB],[msB,msC],[msA,msC]].map(([x,y])=>{
+      const c=msCoppia(x,y);
+      return { tra:[msIng(x).nome, msIng(y).nome], molecole:c.c, jaccard:c.j, principali:(c.m||[]).slice(0,4).map(m=>m.n) };
+    }),
+  };
+  try{
+    const fdb=firestoreDb||firebase.firestore();
+    await fdb.collection('piatti').doc(rec.data+'_'+nome.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40))
+      .set({...rec, timestamp:firebase.firestore.Timestamp.now()});
+    addActivity('🧬 Piatto salvato — '+nome);
+    document.getElementById('msNomePiatto').value='';
+    msRenderPiattiSalvati();
+    alert('✅ Piatto salvato');
+  }catch(e){ alert('Errore nel salvataggio: '+(e.message||e)); }
+}
+
+async function msRenderPiattiSalvati(){
+  const box=document.getElementById('msPiattiSalvati'); if(!box) return;
+  try{
+    const fdb=firestoreDb||firebase.firestore();
+    const snap=await fdb.collection('piatti').orderBy('timestamp','desc').limit(12).get();
+    if(snap.empty){ box.innerHTML=''; return; }
+    let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">Piatti salvati</div>';
+    snap.forEach(d=>{ const p=d.data();
+      h+='<div style="padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06)">'
+        +'<div style="font-size:0.8rem">'+p.nome+'</div>'
+        +'<div style="font-size:0.64rem;color:var(--muted)">'+(p.ingredienti||[]).map(i=>i.icona+' '+i.nome).join(' · ')
+        +(p.pesce?' <span style="color:var(--gold)">+ '+p.pesce+'</span>':'')+' — '+fmtDate(p.data)+'</div></div>';
+    });
+    box.innerHTML=h;
+  }catch(e){ console.warn('piatti:',e); }
 }
 
 
@@ -3264,7 +3307,6 @@ const BILANC_SEED = [
   ['amari','prezzemolo',  null,      0,0,0,1],
 ];
 const BILANC_CAT = ['base','acidi','grassi','dolci','sapidi','amari'];
-const BK = 1.7;
 let bPiatto = [];
 
 function bIngredienti(){
@@ -3378,39 +3420,10 @@ function bNuovoIngr(){
 
 // ── Mappa ───────────────────────────────────────────────
 function bRender(){
-  const MA=14, MR=20, W=420, H=280;
-  const X = v => 46 + Math.min(v,MA)/MA*(W-66);
-  const Y = v => (H-42) - Math.min(v,MR)/MR*(H-70);
-  let banda='', griglia='';
-  for(let a=0;a<=MA;a+=0.5) banda += X(a)+','+Y(a*BK*0.6)+' ';
-  for(let a=MA;a>=0;a-=0.5) banda += X(a)+','+Y(Math.min(a*BK*1.55,MR))+' ';
-  for(let a=4;a<=12;a+=4) griglia += `<line x1="${X(a)}" y1="${Y(0)}" x2="${X(a)}" y2="18" stroke="rgba(255,255,255,0.07)"/><text x="${X(a)}" y="${Y(0)+14}" font-size="9" fill="var(--muted)" text-anchor="middle">${a}</text>`;
-  for(let r=5;r<=20;r+=5) griglia += `<line x1="${X(0)}" y1="${Y(r)}" x2="${W-20}" y2="${Y(r)}" stroke="rgba(255,255,255,0.07)"/><text x="${X(0)-4}" y="${Y(r)+3}" font-size="9" fill="var(--muted)" text-anchor="end">${r}</text>`;
-
-  let ac=0, ri=0, um=0, amr=0, d='M '+X(0)+' '+Y(0), marks='';
-  bPiatto.forEach((id,k)=>{
-    const i=bTrova(id); if(!i) return;
-    ac+=i.a; ri+=i.r; um+=i.u; amr+=i.am;
-    const x=X(ac), y=Y(ri);
-    d += ' L '+x+' '+y;
-    marks += `<circle cx="${x}" cy="${y}" r="3" fill="var(--teal-l)" opacity="0.5"/><text x="${x+5}" y="${y+(k%2?12:-6)}" font-size="9" fill="var(--muted)">${i.nome}</text>`;
-  });
-
-  document.getElementById('bMapWrap').innerHTML = `
-  <svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">
-    <polygon points="${banda}" fill="rgba(76,175,130,0.16)"/>
-    ${griglia}
-    <line x1="${X(0)}" y1="${Y(0)}" x2="${W-20}" y2="${Y(0)}" stroke="var(--border)"/>
-    <line x1="${X(0)}" y1="${Y(0)}" x2="${X(0)}" y2="18" stroke="var(--border)"/>
-    <text x="${W-20}" y="${H-8}" font-size="9" fill="var(--muted)" text-anchor="end">acidità percepita</text>
-    <text x="${X(0)}" y="12" font-size="9" fill="var(--muted)">ricchezza</text>
-    <text x="${X(1)}" y="34" font-size="9" fill="var(--muted)">troppo pesante</text>
-    <text x="${X(7)}" y="${Y(7*BK)-5}" font-size="9" fill="var(--success)" text-anchor="middle">equilibrio</text>
-    <path d="${d}" fill="none" stroke="var(--teal-l)" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.5"/>
-    ${marks}
-    <circle cx="${X(ac)}" cy="${Y(ri)}" r="7" fill="var(--teal-l)"/>
-  </svg>`;
-  document.getElementById('bMapInfo').textContent = bPiatto.length ? `acidità ${ac} · ricchezza ${ri}` : '';
+  // La vecchia mappa equilibrio (valori stimati) e stata rimossa:
+  // il bilanciamento vive nella Matrice Sensoriale, su dati reali.
+  const totali = bPiatto.reduce((t,id)=>{ const i=bTrova(id); if(i){t.a+=i.a;t.r+=i.r;t.u+=i.u;t.am+=i.am;} return t; },{a:0,r:0,u:0,am:0});
+  const ac=totali.a, ri=totali.r, um=totali.u, amr=totali.am;
 
   const sel=document.getElementById('bSel');
   sel.innerHTML = bPiatto.length ? bPiatto.map(id=>{
@@ -3424,24 +3437,6 @@ function bRender(){
       </div></div>`;
   }).join('') : '<div class="empty"><div class="empty-icon">🥣</div><div class="empty-text">Nessun ingrediente</div></div>';
 
-  const alto=ac*BK*1.55, basso=ac*BK*0.6;
-  let msg, serve=null;
-  if(!bPiatto.length) msg='Aggiungi ingredienti per posizionare il piatto.';
-  else if(ri>alto){ msg='Sopra la fascia: troppo ricco per la sua acidità. Sazia presto.'; serve='a'; }
-  else if(ri<basso && ac>2){ msg='Sotto la fascia: acidità scoperta, aggredisce invece di ravvivare.'; serve='r'; }
-  else msg='Dentro la fascia di equilibrio.';
-  const extra=[];
-  if(bPiatto.length>=3 && um<=1) extra.push('Poco umami: rischia di sapere di poco.');
-  if(bPiatto.length>=4 && amr===0) extra.push('Nessun amaro: manca profondità.');
-
-  let h=`<div style="font-size:0.8rem;color:var(--cream);line-height:1.55">${msg}</div>`;
-  extra.forEach(e=> h+=`<div style="font-size:0.75rem;color:var(--muted);line-height:1.55;margin-top:3px">${e}</div>`);
-  if(serve){
-    const cand = bIngredienti().filter(i => (serve==='a' ? i.a>=3 : i.r>=4) && !bPiatto.includes(i.id)).slice(0,6);
-    if(cand.length) h += `<div style="font-size:0.68rem;color:var(--muted);margin:9px 0 5px">sposta il piatto</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px">${cand.map(i=>`<button onclick="bAggiungi('${i.id}')" style="border:1px solid var(--border);background:transparent;color:var(--teal-l);border-radius:999px;padding:4px 10px;font-size:0.7rem;cursor:pointer">${i.nome}</button>`).join('')}</div>`;
-  }
-  document.getElementById('bDiag').innerHTML = h;
   bRenderRicette();
 }
 
