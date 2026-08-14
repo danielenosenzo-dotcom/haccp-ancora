@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v10.9</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.0</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3045,7 +3045,7 @@ function msRenderGriglia(){
     return '<button onclick="msScegliA('+i.id+')" style="border:1px solid '+(on?'var(--teal-l)':'var(--border)')+';background:'+(on?'rgba(14,124,123,0.2)':'transparent')+';color:var(--cream);border-radius:999px;padding:6px 10px;font-size:0.74rem;cursor:pointer;display:flex;align-items:center;gap:5px"><span>'+i.icona+'</span>'+i.nome+'</button>';
   }).join('');
 }
-function msReset(){ msA=null; msB=null; msC=null; msPesce=null; ['msPasso2','msPasso3','msPasso4'].forEach(x=>document.getElementById(x).style.display='none'); msRenderGriglia(); if(msIng(157)) msScegliA(157); }
+function msReset(){ msA=null; msB=null; msC=null; msPesce=null; const p5=document.getElementById('msPasso5'); if(p5) p5.style.display='none'; ['msPasso2','msPasso3','msPasso4'].forEach(x=>document.getElementById(x).style.display='none'); msRenderGriglia(); if(msIng(157)) msScegliA(157); }
 
 function msScegliA(id){
   msA=id; msB=null;
@@ -3074,6 +3074,7 @@ function msRenderPasso2(){
 function msScegliB(id){
   msB=id; msC=null;
   document.getElementById('msPasso4').style.display='none';
+  const p5=document.getElementById('msPasso5'); if(p5) p5.style.display='none';
   msRenderPasso2();
   msRenderPasso3(true);
 }
@@ -3133,6 +3134,56 @@ function msRenderPiatto(){
   h+='</div>';
   p4.innerHTML=h;
   p4.scrollIntoView({behavior:'smooth',block:'nearest'});
+  msRenderGusto();
+}
+
+// Passo 5: bilanciamento — gusto molecolare reale (USDA + pH), non l'aroma.
+// zuccheri/grasso/sodio/glutammato per 100g da USDA FoodData Central; pH da tabelle FDA.
+function msRenderGusto(){
+  let p5=document.getElementById('msPasso5');
+  if(!p5){ p5=document.createElement('div'); p5.id='msPasso5'; document.getElementById('msPasso4').insertAdjacentElement('afterend', p5); }
+  const trio=[msIng(msA),msIng(msB),msIng(msC)];
+  p5.style.display='block';
+
+  const conDati=trio.filter(i=>i.gusto&&i.gusto.fonteUSDA);
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">5 · Bilanciamento — gusto molecolare</div>';
+  h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
+
+  trio.forEach(i=>{
+    const g=i.gusto;
+    h+='<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06)">';
+    h+='<div style="display:flex;align-items:center;gap:7px;font-size:0.78rem"><span>'+i.icona+'</span><span style="flex:1">'+i.nome+'</span>';
+    if(g&&g.ph!=null) h+='<span style="font-size:0.62rem;color:var(--muted)">pH '+g.ph+'</span>';
+    h+='</div>';
+    if(g&&g.fonteUSDA){
+      const bar=(v,max,col)=>'<div style="flex:1;height:8px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden"><div style="width:'+Math.min(100,Math.round((v||0)/max*100))+'%;height:100%;background:'+col+';border-radius:999px"></div></div>';
+      h+='<div style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:0.6rem;color:var(--muted)"><span style="width:44px">zucch.</span>'+bar(g.zuccheri,15,'#d05c6a')+'<span style="width:30px;text-align:right">'+(g.zuccheri??'—')+'g</span></div>';
+      h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px;font-size:0.6rem;color:var(--muted)"><span style="width:44px">grasso</span>'+bar(g.grasso,20,'#c9a84c')+'<span style="width:30px;text-align:right">'+(g.grasso??'—')+'g</span></div>';
+      h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px;font-size:0.6rem;color:var(--muted)"><span style="width:44px">umami</span>'+bar(g.glutammato_g,2,'#8a6fb0')+'<span style="width:30px;text-align:right">'+(g.glutammato_g??'—')+'g</span></div>';
+      h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:3px">fonte: '+g.fonteUSDA+' · per 100g</div>';
+    } else {
+      h+='<div style="font-size:0.65rem;color:var(--gold);margin-top:3px">dato USDA non ancora caricato per questo ingrediente</div>';
+    }
+    h+='</div>';
+  });
+  h+='</div>';
+
+  if(conDati.length>=2){
+    const phVals=conDati.filter(i=>i.gusto.ph!=null).map(i=>i.gusto.ph);
+    const zucTot=conDati.reduce((s,i)=>s+(i.gusto.zuccheri||0),0);
+    const grTot=conDati.reduce((s,i)=>s+(i.gusto.grasso||0),0);
+    const gluTot=conDati.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
+    let nota='';
+    if(phVals.length>=2){
+      const spread=Math.max(...phVals)-Math.min(...phVals);
+      if(spread<0.8 && zucTot<3 && grTot<3) nota='Nessun ingrediente marcatamente acido o grasso nel trio: il piatto rischia di risultare piatto, poco contrasto.';
+      else if(spread>=2) nota='Buon divario di pH nel trio: c\'è una componente acida che può ravvivare le altre.';
+    }
+    if(gluTot>1.5) nota += (nota?' ':'')+'Umami presente: il piatto ha già una base sapida.';
+    if(nota) h+='<div style="font-size:0.68rem;color:var(--teal-l);line-height:1.5;margin-top:10px">'+nota+'</div>';
+  }
+  h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:10px">dati reali USDA FoodData Central + tabella pH FDA · '+conDati.length+'/3 ingredienti con dato completo</div>';
+  p5.innerHTML='<div style="margin-top:6px">'+h+'</div>';
 }
 
 
