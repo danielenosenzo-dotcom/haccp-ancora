@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v10.7</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v10.8</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3028,8 +3028,9 @@ async function msInit(){
   try{
     const r=await fetch('matrice-dati.json?v=1');
     MS=await r.json();
-    stato.textContent='Scegli un ingrediente: l’app trova gli abbinamenti per molecole condivise, poi il terzo elemento che fa da ponte.';
+    stato.textContent='Prova col carciofo: gli abbinamenti sono per molecole condivise, poi il terzo elemento che fa da ponte. Tocca un altro ingrediente per cambiare.';
     msRenderGriglia();
+    if(msIng(157)) msScegliA(157);  // parte dal carciofo
   }catch(e){ if(stato) stato.textContent='⚠️ Dati molecolari non caricati: '+(e.message||e); }
 }
 function msIng(id){ return MS.ingredienti.find(x=>x.id===id); }
