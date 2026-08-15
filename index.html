@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.5</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.6</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3245,25 +3245,71 @@ async function msEliminaPiatto(docId){
   }catch(e){ alert('Errore: '+(e.message||e)); }
 }
 
+let msPiattiCache=[], msApertoDoc=null, msGruppoAperto=null;
+
 async function msRenderPiattiSalvati(){
   const box=document.getElementById('msPiattiSalvati'); if(!box) return;
   try{
     const fdb=firestoreDb||firebase.firestore();
-    const snap=await fdb.collection('piatti').orderBy('timestamp','desc').limit(12).get();
-    if(snap.empty){ box.innerHTML=''; return; }
-    let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">Piatti salvati</div>';
-    snap.forEach(d=>{ const p=d.data();
-      const ids=(p.ingredienti||[]).map(i=>i.id).join(',');
-      h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06)">'
-        +'<div style="flex:1;min-width:0"><div style="font-size:0.8rem">'+p.nome+'</div>'
-        +'<div style="font-size:0.64rem;color:var(--muted)">'+(p.ingredienti||[]).map(i=>i.icona+' '+i.nome).join(' · ')
-        +(p.pesce?' <span style="color:var(--gold)">+ '+p.pesce+'</span>':'')+'</div></div>'
-        +'<button class="btn btn-o" style="padding:4px 9px;font-size:0.68rem;margin:0" onclick="msApriPiatto(\''+ids+'\',\''+(p.pesce||'')+'\',\''+d.id+'\')">apri</button>'
-        +'<button class="btn btn-o" style="padding:4px 8px;font-size:0.68rem;margin:0" onclick="msEliminaPiatto(\''+d.id+'\')">✕</button></div>';
-    });
-    box.innerHTML=h;
+    const snap=await fdb.collection('piatti').orderBy('timestamp','desc').limit(60).get();
+    msPiattiCache=[]; snap.forEach(d=>msPiattiCache.push({docId:d.id, ...d.data()}));
+    msDisegnaPiattiSalvati();
   }catch(e){ console.warn('piatti:',e); }
 }
+
+// Raggruppa per l'ingrediente principale: il primo scelto nel piatto,
+// quello da cui e' partita la ricerca (es. "Carciofo").
+function msDisegnaPiattiSalvati(){
+  const box=document.getElementById('msPiattiSalvati'); if(!box) return;
+  if(!msPiattiCache.length){ box.innerHTML=''; return; }
+
+  const gruppi=new Map();
+  msPiattiCache.forEach(p=>{
+    const principale=(p.ingredienti&&p.ingredienti[0]) || {nome:'Altro',icona:'🍽️'};
+    const k=principale.nome;
+    if(!gruppi.has(k)) gruppi.set(k, {icona:principale.icona, nome:k, piatti:[]});
+    gruppi.get(k).piatti.push(p);
+  });
+
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">Piatti salvati — '+msPiattiCache.length+'</div>';
+  [...gruppi.values()].sort((a,b)=>b.piatti.length-a.piatti.length).forEach(g=>{
+    const gAperto=msGruppoAperto===g.nome;
+    h+='<div style="border-bottom:1px solid rgba(255,255,255,0.06)">';
+    h+='<div onclick="msToggleGruppo(\''+g.nome.replace(/'/g,"\\'")+'\')" style="display:flex;align-items:center;gap:8px;padding:8px 2px;cursor:pointer">'
+      +'<span style="font-size:1rem">'+g.icona+'</span>'
+      +'<span style="flex:1;font-size:0.82rem;font-weight:600">'+g.nome+'</span>'
+      +'<span style="font-size:0.66rem;color:var(--muted)">'+g.piatti.length+'</span>'
+      +'<span style="color:var(--muted);font-size:0.8rem">'+(gAperto?'▾':'›')+'</span></div>';
+    if(gAperto){
+      h+='<div style="padding-left:6px">'+g.piatti.map(p=>msRigaPiatto(p)).join('')+'</div>';
+    }
+    h+='</div>';
+  });
+  box.innerHTML=h;
+}
+
+function msRigaPiatto(p){
+  const aperto=msApertoDoc===p.docId;
+  const ids=(p.ingredienti||[]).map(i=>i.id).join(',');
+  let h='<div style="border-top:1px solid rgba(255,255,255,0.05)">';
+  h+='<div onclick="msTogglePiatto(\''+p.docId+'\')" style="display:flex;align-items:center;gap:8px;padding:7px 2px;cursor:pointer">'
+    +'<span style="flex:1;font-size:0.78rem;min-width:0">'+p.nome+'</span>'
+    +(p.pesce?'<span style="font-size:0.62rem;color:var(--gold)">'+p.pesce+'</span>':'')
+    +'<span style="color:var(--muted);font-size:0.75rem">'+(aperto?'▾':'›')+'</span></div>';
+  if(aperto){
+    h+='<div style="padding:2px 4px 10px 4px">'
+      +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'+(p.ingredienti||[]).map(i=>
+        '<span style="border:1px solid var(--border);border-radius:999px;padding:3px 8px;font-size:0.68rem">'+i.icona+' '+i.nome+'</span>').join('')+'</div>'
+      +'<div style="display:flex;gap:6px">'
+      +'<button class="btn btn-o" style="padding:5px 11px;font-size:0.68rem;margin:0" onclick="msApriPiatto(\''+ids+'\',\''+(p.pesce||'')+'\',\''+p.docId+'\')">apri e modifica</button>'
+      +'<button class="btn btn-o" style="padding:5px 10px;font-size:0.68rem;margin:0" onclick="msEliminaPiatto(\''+p.docId+'\')">elimina</button>'
+      +'</div></div>';
+  }
+  return h+'</div>';
+}
+
+function msToggleGruppo(nome){ msGruppoAperto = msGruppoAperto===nome ? null : nome; msApertoDoc=null; msDisegnaPiattiSalvati(); }
+function msTogglePiatto(docId){ msApertoDoc = msApertoDoc===docId ? null : docId; msDisegnaPiattiSalvati(); }
 
 
 function bInit(){ msInit(); }
