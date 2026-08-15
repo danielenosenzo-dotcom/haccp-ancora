@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.6</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.7</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3084,7 +3084,23 @@ function msRenderPonti(){
       +'<span style="color:var(--teal-l);font-size:0.72rem">'+p.c.c+'</span></div>'
       +(mol?'<div style="font-size:0.62rem;color:var(--muted);margin-top:2px">'+mol+'</div>':'')+'</div>';
   });
-  if(debole && debole.c.j<0.3) h+='<div style="font-size:0.66rem;color:var(--gold);margin-top:8px">Anello debole: '+debole.a.nome+' e '+debole.b.nome+' condividono poco. Serve un ponte fra i due.</div>';
+  if(debole && debole.c.j<0.3){
+    // Cerca chi lega bene ENTRAMBI gli estremi dell'anello debole: il vero terzo elemento ponte.
+    const candidatiPonte=MS.ingredienti.filter(i=>!msPiatto.includes(i.id)).map(i=>{
+      const jA=msCoppia(debole.a.id,i.id).j, jB=msCoppia(debole.b.id,i.id).j;
+      return {i, jA, jB, forza:Math.min(jA,jB)};
+    }).sort((x,y)=>y.forza-x.forza).slice(0,3).filter(c=>c.forza>0.15);
+    h+='<div style="font-size:0.66rem;color:var(--gold);margin-top:8px">Anello debole: '+debole.a.nome+' e '+debole.b.nome+' condividono poco.</div>';
+    if(candidatiPonte.length){
+      h+='<div style="font-size:0.62rem;color:var(--muted);margin:6px 0 4px">Un terzo elemento che lega entrambi:</div>';
+      h+=candidatiPonte.map(c=>'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,0.06)">'
+        +'<span>'+c.i.icona+'</span><span style="flex:1;font-size:0.76rem;min-width:0">'+c.i.nome+'</span>'
+        +'<span style="font-size:0.6rem;color:var(--muted);white-space:nowrap">'+debole.a.nome+' '+Math.round(c.jA*100)+' · '+debole.b.nome+' '+Math.round(c.jB*100)+'</span>'
+        +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>').join('');
+    } else {
+      h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:4px">Nessun ponte forte trovato in questi 17 ingredienti — con più ingredienti nel database sarà più facile trovarne uno.</div>';
+    }
+  }
   h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">numero = molecole aromatiche condivise · FlavorDB2</div></div>';
   p4.innerHTML=h;
 }
