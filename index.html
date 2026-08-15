@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.3</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.4</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3013,225 +3013,242 @@ function initApp(){
 // Dati precalcolati offline (Jaccard + molecole ponte) in matrice-dati.json.
 // Fonte: FlavorDB2 (CC BY-NC-SA). Metrica: indice di Jaccard (NON conteggio grezzo).
 // ═══════════════════════════════════════════════════════
-let MS=null, msDocCorrente=null, msA=null, msB=null, msC=null, msPesce=null;
-const MS_PESCI=[['Calamaro','🦑'],['Gambero','🦐'],['Tonno','🐟'],['Polpo','🐙'],['Seppia','🦑'],['Acciuga','🐟'],['Branzino','🐟'],['Orata','🐟'],['Ricciola','🐟'],['Scampo','🦞']];
+// ═══════════════════════════════════════════════════════
+// MATRICE SENSORIALE — food bridging su dati reali FlavorDB2
+// Il piatto e una LISTA LIBERA di ingredienti (non piu tre fissi):
+// aggiungere non sostituisce, e ogni elemento si toglie singolarmente.
+// Fonte: FlavorDB2 (CC BY-NC-SA) · gusto: USDA FoodData Central + pH FDA.
+// ═══════════════════════════════════════════════════════
+let MS=null, msDocCorrente=null, msPiatto=[], msPesce=null;
 
 async function msInit(){
   const stato=document.getElementById('msStato');
-  if(MS){ msReset(); return; }
+  if(MS){ msRenderTutto(); msRenderPiattiSalvati(); return; }
   try{
-    const r=await fetch('matrice-dati.json?v=1');
+    const r=await fetch('matrice-dati.json?v=2');
     MS=await r.json();
-    stato.textContent='Prova col carciofo: gli abbinamenti sono per molecole condivise, poi il terzo elemento che fa da ponte. Tocca un altro ingrediente per cambiare.';
-    msRenderGriglia();
-    if(msIng(157)) msScegliA(157);  // parte dal carciofo
+    stato.textContent='Aggiungi ingredienti: l’app calcola i ponti molecolari fra tutti e ti dice cosa manca.';
+    if(!msPiatto.length && msIng(157)) msPiatto=[157];
+    msRenderTutto();
     msRenderPiattiSalvati();
   }catch(e){ if(stato) stato.textContent='⚠️ Dati molecolari non caricati: '+(e.message||e); }
 }
 function msIng(id){ return MS.ingredienti.find(x=>x.id===id); }
 function msCoppia(a,b){ return MS.coppie[a+'-'+b] || MS.coppie[b+'-'+a] || {j:0,c:0,m:[]}; }
+// forza di legame di un candidato col piatto = affinita col PIU DEBOLE dei presenti
+function msLegame(id){ return msPiatto.length ? Math.min(...msPiatto.map(x=>msCoppia(x,id).j)) : 0; }
 
+function msAggiungi(id){ if(!msPiatto.includes(id)) msPiatto.push(id); msRenderTutto(); }
+function msTogli(id){ msPiatto=msPiatto.filter(x=>x!==id); msRenderTutto(); }
+function msAggiungiPesce(nome){ msPesce=(msPesce===nome?null:nome); msRenderTutto(); }
+function msReset(){ msPiatto=msIng(157)?[157]:[]; msPesce=null; msDocCorrente=null; msRenderTutto(); }
+
+function msRenderTutto(){
+  msRenderGriglia();
+  msRenderPiattoCorrente();
+  msRenderCandidati();
+  msRenderPonti();
+  msRenderVista();
+  msRenderGusto();
+  msRenderSalva();
+}
+
+// ── Passo 1: catalogo ─────────────────────────────────────
 function msRenderGriglia(){
   const box=document.getElementById('msGriglia');
   box.innerHTML=MS.ingredienti.map(i=>{
-    const on=msA===i.id;
-    return '<button onclick="msScegliA('+i.id+')" style="border:1px solid '+(on?'var(--teal-l)':'var(--border)')+';background:'+(on?'rgba(14,124,123,0.2)':'transparent')+';color:var(--cream);border-radius:999px;padding:6px 10px;font-size:0.74rem;cursor:pointer;display:flex;align-items:center;gap:5px"><span>'+i.icona+'</span>'+i.nome+'</button>';
+    const on=msPiatto.includes(i.id);
+    return '<button onclick="'+(on?'msTogli':'msAggiungi')+'('+i.id+')" style="border:1px solid '+(on?'var(--teal-l)':'var(--border)')+';background:'+(on?'rgba(14,124,123,0.2)':'transparent')+';color:var(--cream);border-radius:999px;padding:6px 10px;font-size:0.74rem;cursor:pointer;display:flex;align-items:center;gap:5px"><span>'+i.icona+'</span>'+i.nome+(on?' <span style="opacity:0.6">✕</span>':'')+'</button>';
   }).join('');
 }
-function msReset(){ msA=null; msB=null; msC=null; msPesce=null; const p5=document.getElementById('msPasso5'); if(p5) p5.style.display='none'; const sv0=document.getElementById('msSalva'); if(sv0) sv0.style.display='none'; ['msPasso2','msPasso3','msPasso4'].forEach(x=>document.getElementById(x).style.display='none'); msRenderGriglia(); if(msIng(157)) msScegliA(157); }
 
-function msScegliA(id){
-  msA=id; msB=null;
-  document.getElementById('msPasso3').style.display='none';
-  msRenderGriglia();
-  msRenderPasso2();
-}
-function msRenderPasso2(){
-  const A=msIng(msA);
-  const rank=MS.ingredienti.filter(i=>i.id!==msA)
-    .map(i=>({i, j:msCoppia(msA,i.id).j})).sort((x,y)=>y.j-x.j);
+// ── Il piatto in costruzione ──────────────────────────────
+function msRenderPiattoCorrente(){
   const p2=document.getElementById('msPasso2');
   p2.style.display='block';
-  p2.innerHTML='<div style="font-size:0.72rem;color:var(--cream);margin:14px 0 6px">2 · Abbinamenti di '+A.icona+' '+A.nome+' <span style="color:var(--muted)">(per molecole condivise)</span></div>'
-    + rank.map(r=>{
-      const pct=Math.round(r.j*100), on=msB===r.i.id;
-      return '<div onclick="msScegliB('+r.i.id+')" style="display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;'+(on?'background:rgba(14,124,123,0.08)':'')+'">'
-        +'<div style="width:20px;text-align:center">'+r.i.icona+'</div>'
-        +'<div style="flex:1;font-size:0.8rem">'+r.i.nome+'</div>'
-        +'<div style="flex:1;height:11px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;max-width:120px"><div style="width:'+pct+'%;height:100%;background:var(--teal-l);border-radius:999px"></div></div>'
-        +'<div style="width:30px;text-align:right;font-size:0.7rem;color:var(--muted)">'+pct+'</div>'
-        +'<div style="width:12px;color:var(--muted)">'+(on?'▾':'›')+'</div></div>';
-    }).join('');
+  if(!msPiatto.length){ p2.innerHTML='<div style="font-size:0.7rem;color:var(--muted);margin-top:12px">Nessun ingrediente: scegline uno sopra.</div>'; return; }
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:14px 0 6px">Il piatto — '+msPiatto.length+' ingredienti</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px">'+msPiatto.map(id=>{
+    const i=msIng(id);
+    return '<span style="border:1px solid var(--teal-l);background:rgba(14,124,123,0.18);border-radius:999px;padding:5px 9px;font-size:0.74rem;display:inline-flex;align-items:center;gap:6px">'
+      +i.icona+' '+i.nome+'<span onclick="msTogli('+id+')" style="cursor:pointer;opacity:0.65;font-size:0.8rem">✕</span></span>';
+  }).join('')+'</div>';
+  p2.innerHTML=h;
 }
 
-function msScegliB(id){
-  msB=id; msC=null;
-  document.getElementById('msPasso4').style.display='none';
-  const p5=document.getElementById('msPasso5'); if(p5) p5.style.display='none';
-  const sv1=document.getElementById('msSalva'); if(sv1) sv1.style.display='none';
-  msRenderPasso2();
-  msRenderPasso3(true);
-}
-function msRenderPasso3(scroll){
-  const A=msIng(msA), B=msIng(msB), cp=msCoppia(msA,msB);
-  const terzi=MS.ingredienti.filter(i=>i.id!==msA&&i.id!==msB)
-    .map(i=>({i, jA:msCoppia(msA,i.id).j, jB:msCoppia(msB,i.id).j}))
-    .map(t=>({...t, forza:Math.min(t.jA,t.jB)}))
-    .sort((x,y)=>y.forza-x.forza).slice(0,4);
+// ── Candidati: chi si lega meglio a TUTTO il piatto ────────
+function msRenderCandidati(){
   const p3=document.getElementById('msPasso3');
+  if(!msPiatto.length){ p3.style.display='none'; return; }
   p3.style.display='block';
-  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">3 · Il ponte tra '+A.icona+' '+A.nome+' e '+B.icona+' '+B.nome+'</div>';
-  h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;font-size:0.78rem;margin-bottom:8px"><span>'+A.icona+' '+A.nome+'</span><span style="color:var(--teal-l);font-weight:600">'+cp.c+' molecole</span><span>'+B.icona+' '+B.nome+'</span></div>';
-  h+= cp.m.length ? cp.m.map(m=>'<div style="padding:5px 0;border-top:1px solid rgba(255,255,255,0.06)"><div style="font-size:0.74rem">'+m.n+'</div><div style="font-size:0.64rem;color:var(--teal-l)">'+m.p+'</div></div>').join('')
-    : '<div style="font-size:0.7rem;color:var(--muted)">Nessuna molecola condivisa diretta: serve un ponte, qui sotto.</div>';
-  h+='</div>';
-  h+='<div style="font-size:0.68rem;color:var(--gold);margin:12px 0 6px">🔺 Terzo elemento ponte — tocca per comporre il piatto</div>';
-  h+=terzi.map(t=>'<div onclick="msScegliC('+t.i.id+')" style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;'+(msC===t.i.id?'background:rgba(201,168,76,0.1)':'')+'"><span>'+t.i.icona+'</span><span style="flex:1;font-size:0.78rem">'+t.i.nome+'</span><span style="font-size:0.62rem;color:var(--muted)">'+A.nome+' '+Math.round(t.jA*100)+' · '+B.nome+' '+Math.round(t.jB*100)+'</span><span style="width:12px;color:var(--muted)">›</span></div>').join('');
-  h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:10px">dati reali FlavorDB2 (CC BY-NC-SA) · affinità = indice di Jaccard</div>';
-  h+='<button class="btn btn-o" style="margin-top:10px;font-size:0.72rem;padding:7px" onclick="msReset()">Ricomincia</button>';
+  const rank=MS.ingredienti.filter(i=>!msPiatto.includes(i.id))
+    .map(i=>({i, j:msLegame(i.id)})).sort((a,b)=>b.j-a.j).slice(0,10);
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">Si legano bene al piatto <span style="color:var(--muted)">(tocca per aggiungere)</span></div>';
+  h+=rank.map(r=>{
+    const pct=Math.round(r.j*100);
+    return '<div onclick="msAggiungi('+r.i.id+')" style="display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer">'
+      +'<div style="width:20px;text-align:center">'+r.i.icona+'</div>'
+      +'<div style="flex:1;font-size:0.8rem;min-width:0">'+r.i.nome+'</div>'
+      +'<div style="flex:1;height:11px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;max-width:100px"><div style="width:'+pct+'%;height:100%;background:var(--teal-l);border-radius:999px"></div></div>'
+      +'<div style="width:26px;text-align:right;font-size:0.7rem;color:var(--muted)">'+pct+'</div>'
+      +'<div style="width:14px;color:var(--teal-l);font-size:0.9rem">+</div></div>';
+  }).join('');
   p3.innerHTML=h;
-  if(scroll) p3.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-// Passo 4: composizione del piatto — trio molecolare + il pesce scelto dallo chef
-function msScegliC(id){
-  msC=id; msRenderPasso3(false);     // ri-disegna passo3 con C evidenziato, senza scroll
-  msRenderPiatto();
-}
-function msAggiungiPesce(nome){ msPesce=(msPesce===nome?null:nome); msRenderPiatto(); }
-
-function msRenderPiatto(){
+// ── I ponti fra le coppie del piatto ──────────────────────
+function msRenderPonti(){
   const p4=document.getElementById('msPasso4');
+  if(msPiatto.length<2){ p4.style.display='none'; return; }
   p4.style.display='block';
-  const A=msIng(msA), B=msIng(msB), C=msIng(msC);
-  // disposizione: trio in triangolo, pesce al centro (l'innesto dello chef)
-  const nodi=[{x:70,y:56,ing:A},{x:230,y:56,ing:B},{x:150,y:170,ing:C}];
-  const cx=150, cy=110;
-  // archi tra le materie prime: spessore = jaccard
-  const arco=(a,b)=>{const j=msCoppia(a.ing.id,b.ing.id).j; return '<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="var(--teal-l)" stroke-width="'+(1+j*10).toFixed(1)+'" opacity="0.5"/>';};
-  let svg='<svg viewBox="0 0 300 210" style="width:100%;max-width:340px;display:block;margin:4px auto">';
-  svg+=arco(nodi[0],nodi[1])+arco(nodi[1],nodi[2])+arco(nodi[0],nodi[2]);
-  if(msPesce){ nodi.forEach(n=> svg+='<line x1="'+cx+'" y1="'+cy+'" x2="'+n.x+'" y2="'+n.y+'" stroke="var(--gold)" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.7"/>'); }
-  nodi.forEach(n=>{ svg+='<circle cx="'+n.x+'" cy="'+n.y+'" r="20" fill="var(--card)" stroke="var(--teal-l)" stroke-width="1.5"/><text x="'+n.x+'" y="'+(n.y+6)+'" text-anchor="middle" font-size="17">'+n.ing.icona+'</text><text x="'+n.x+'" y="'+(n.y+34)+'" text-anchor="middle" font-size="9" fill="var(--muted)">'+n.ing.nome+'</text>'; });
-  if(msPesce){ const pe=MS_PESCI.find(p=>p[0]===msPesce);
-    svg+='<circle cx="'+cx+'" cy="'+cy+'" r="22" fill="rgba(201,168,76,0.15)" stroke="var(--gold)" stroke-width="2"/><text x="'+cx+'" y="'+(cy+6)+'" text-anchor="middle" font-size="18">'+(pe?pe[1]:'🐟')+'</text>'; }
-  svg+='</svg>';
-
-  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">4 · Il piatto</div>';
+  const coppie=[];
+  for(let a=0;a<msPiatto.length;a++) for(let b=a+1;b<msPiatto.length;b++){
+    const c=msCoppia(msPiatto[a],msPiatto[b]);
+    coppie.push({a:msIng(msPiatto[a]), b:msIng(msPiatto[b]), c});
+  }
+  coppie.sort((x,y)=>y.c.j-x.c.j);
+  const debole=coppie[coppie.length-1];
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">Ponti molecolari</div>';
   h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
-  h+=svg;
-  h+='<div style="font-size:0.66rem;color:var(--muted);line-height:1.5;text-align:center;margin-top:4px">'
-    +A.nome+' · '+B.nome+' · '+C.nome+' legati per aroma'+(msPesce?'<br><span style="color:var(--gold)">'+msPesce+' — il tuo innesto</span>':'')+'</div>';
-  h+='<div style="font-size:0.66rem;color:var(--cream);margin:12px 0 6px">Aggiungi il pesce <span style="color:var(--muted)">(la parte che metti tu)</span></div>';
-  h+='<div style="display:flex;flex-wrap:wrap;gap:5px">'+MS_PESCI.map(p=>'<button onclick="msAggiungiPesce(\''+p[0]+'\')" style="border:1px solid '+(msPesce===p[0]?'var(--gold)':'var(--border)')+';background:'+(msPesce===p[0]?'rgba(201,168,76,0.15)':'transparent')+';color:var(--cream);border-radius:999px;padding:5px 9px;font-size:0.72rem;cursor:pointer">'+p[1]+' '+p[0]+'</button>').join('')+'</div>';
-  h+='</div>';
+  coppie.forEach(p=>{
+    const mol=(p.c.m||[]).slice(0,3).map(m=>m.n).join(', ');
+    h+='<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06)">'
+      +'<div style="display:flex;align-items:center;gap:6px;font-size:0.75rem"><span>'+p.a.icona+'</span><span style="color:var(--muted)">↔</span><span>'+p.b.icona+'</span>'
+      +'<span style="flex:1;min-width:0">'+p.a.nome+' · '+p.b.nome+'</span>'
+      +'<span style="color:var(--teal-l);font-size:0.72rem">'+p.c.c+'</span></div>'
+      +(mol?'<div style="font-size:0.62rem;color:var(--muted);margin-top:2px">'+mol+'</div>':'')+'</div>';
+  });
+  if(debole && debole.c.j<0.3) h+='<div style="font-size:0.66rem;color:var(--gold);margin-top:8px">Anello debole: '+debole.a.nome+' e '+debole.b.nome+' condividono poco. Serve un ponte fra i due.</div>';
+  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">numero = molecole aromatiche condivise · FlavorDB2</div></div>';
   p4.innerHTML=h;
-  p4.scrollIntoView({behavior:'smooth',block:'nearest'});
-  msRenderGusto();
 }
 
-// Passo 5: bilanciamento — gusto molecolare reale (USDA + pH), non l'aroma.
-// zuccheri/grasso/sodio/glutammato per 100g da USDA FoodData Central; pH da tabelle FDA.
+// ── Vista del piatto + innesto pesce ──────────────────────
+const MS_PESCI=[['Calamaro','🦑'],['Polpo','🐙'],['Seppia','🦑'],['Tonno','🍣'],['Gambero','🦐'],['Branzino','🐟'],['Ricciola','🐟'],['Sgombro','🐟']];
+function msRenderVista(){
+  let box=document.getElementById('msVista');
+  if(!box){ box=document.createElement('div'); box.id='msVista'; document.getElementById('msPasso4').insertAdjacentElement('afterend', box); }
+  if(msPiatto.length<2){ box.innerHTML=''; return; }
+  const n=msPiatto.length, R=68, cx=150, cy=100;
+  let svg='<svg viewBox="0 0 300 200" style="width:100%;max-width:330px;display:block;margin:4px auto">';
+  const pos=msPiatto.map((id,k)=>{ const ang=(k/n)*2*Math.PI-Math.PI/2; return {x:cx+Math.cos(ang)*R, y:cy+Math.sin(ang)*R, ing:msIng(id)}; });
+  for(let a=0;a<n;a++) for(let b=a+1;b<n;b++){
+    const j=msCoppia(msPiatto[a],msPiatto[b]).j;
+    svg+='<line x1="'+pos[a].x+'" y1="'+pos[a].y+'" x2="'+pos[b].x+'" y2="'+pos[b].y+'" stroke="var(--teal-l)" stroke-width="'+(0.6+j*5).toFixed(1)+'" opacity="0.45"/>';
+  }
+  if(msPesce) pos.forEach(p=> svg+='<line x1="'+cx+'" y1="'+cy+'" x2="'+p.x+'" y2="'+p.y+'" stroke="var(--gold)" stroke-width="1" stroke-dasharray="4 3" opacity="0.7"/>');
+  pos.forEach(p=>{ svg+='<circle cx="'+p.x+'" cy="'+p.y+'" r="16" fill="var(--card)" stroke="var(--teal-l)" stroke-width="1.4"/><text x="'+p.x+'" y="'+(p.y+5)+'" text-anchor="middle" font-size="14">'+p.ing.icona+'</text><text x="'+p.x+'" y="'+(p.y+29)+'" text-anchor="middle" font-size="8" fill="var(--muted)">'+p.ing.nome+'</text>'; });
+  if(msPesce){ const pe=MS_PESCI.find(x=>x[0]===msPesce);
+    svg+='<circle cx="'+cx+'" cy="'+cy+'" r="19" fill="rgba(201,168,76,0.15)" stroke="var(--gold)" stroke-width="2"/><text x="'+cx+'" y="'+(cy+6)+'" text-anchor="middle" font-size="16">'+(pe?pe[1]:'🐟')+'</text>'; }
+  svg+='</svg>';
+  let h='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card);margin-top:12px">'+svg;
+  h+='<div style="font-size:0.66rem;color:var(--cream);margin:8px 0 6px">Il pesce <span style="color:var(--muted)">(lo metti tu)</span></div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:5px">'+MS_PESCI.map(p=>'<button onclick="msAggiungiPesce(\''+p[0]+'\')" style="border:1px solid '+(msPesce===p[0]?'var(--gold)':'var(--border)')+';background:'+(msPesce===p[0]?'rgba(201,168,76,0.15)':'transparent')+';color:var(--cream);border-radius:999px;padding:5px 9px;font-size:0.72rem;cursor:pointer">'+p[1]+' '+p[0]+'</button>').join('')+'</div></div>';
+  box.innerHTML=h;
+}
+
+// ── Gusto: dati reali USDA + pH ───────────────────────────
 function msRenderGusto(){
   let p5=document.getElementById('msPasso5');
-  if(!p5){ p5=document.createElement('div'); p5.id='msPasso5'; document.getElementById('msPasso4').insertAdjacentElement('afterend', p5); }
-  const trio=[msIng(msA),msIng(msB),msIng(msC)];
+  if(!p5){ p5=document.createElement('div'); p5.id='msPasso5'; document.getElementById('msVista').insertAdjacentElement('afterend', p5); }
+  if(!msPiatto.length){ p5.style.display='none'; return; }
   p5.style.display='block';
+  const ingr=msPiatto.map(id=>msIng(id));
+  const conDati=ingr.filter(i=>i.gusto&&i.gusto.fonteUSDA);
 
-  const conDati=trio.filter(i=>i.gusto&&i.gusto.fonteUSDA);
-  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">5 · Bilanciamento — gusto molecolare</div>';
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">Bilanciamento — gusto molecolare</div>';
 
-  // Mappa del gusto: assi DERIVATI da dati reali, non da stime.
-  //   acidità = (7 - pH) x 2      → il pH viene dalle tabelle FDA
-  //   ricchezza = grasso + zuccheri (g/100g) → da USDA
   if(conDati.length){
-    const W=300,H=200, MA=10, MR=30;
-    const X=v=>40+Math.min(v,MA)/MA*(W-58);
-    const Y=v=>(H-30)-Math.min(v,MR)/MR*(H-50);
-    const acidoDa=g=>g.ph!=null?Math.max(0,(7-g.ph)*2):null;
-    const ricchDa=g=>(g.grasso||0)+(g.zuccheri||0);
-    let griglia='',punti='';
-    for(let a=2;a<=10;a+=4) griglia+='<line x1="'+X(a)+'" y1="'+Y(0)+'" x2="'+X(a)+'" y2="16" stroke="rgba(255,255,255,0.07)"/><text x="'+X(a)+'" y="'+(Y(0)+13)+'" font-size="8" fill="var(--muted)" text-anchor="middle">'+a+'</text>';
-    for(let r=10;r<=30;r+=10) griglia+='<line x1="'+X(0)+'" y1="'+Y(r)+'" x2="'+(W-14)+'" y2="'+Y(r)+'" stroke="rgba(255,255,255,0.07)"/><text x="'+(X(0)-4)+'" y="'+(Y(r)+3)+'" font-size="8" fill="var(--muted)" text-anchor="end">'+r+'</text>';
-    conDati.forEach((i,k)=>{
-      const a=acidoDa(i.gusto), r=ricchDa(i.gusto);
-      if(a==null) return;
-      const x=X(a), y=Y(r);
-      punti+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="var(--teal-l)" opacity="0.85"/>'
-        +'<text x="'+x+'" y="'+(y+3)+'" text-anchor="middle" font-size="8">'+i.icona+'</text>'
-        +'<text x="'+x+'" y="'+(y+(k%2?18:-11))+'" text-anchor="middle" font-size="8" fill="var(--muted)">'+i.nome+'</text>';
-    });
-    h+='<div style="border:1px solid var(--border);border-radius:12px;padding:9px;background:var(--card);margin-bottom:8px">'
-      +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block">'+griglia
-      +'<line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+(W-14)+'" y2="'+Y(0)+'" stroke="var(--border)"/>'
-      +'<line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+X(0)+'" y2="16" stroke="var(--border)"/>'
-      +'<text x="'+(W-14)+'" y="'+(H-6)+'" font-size="8" fill="var(--muted)" text-anchor="end">acidità (da pH)</text>'
-      +'<text x="'+X(0)+'" y="11" font-size="8" fill="var(--muted)">ricchezza g/100g</text>'
-      +punti+'</svg>'
-      +'<div style="font-size:0.58rem;color:var(--muted);line-height:1.4;margin-top:4px">assi calcolati: acidità = (7 − pH) × 2 · ricchezza = grasso + zuccheri. Posizioni reali, nessuna stima.</div></div>';
+    const W=300,H=190, MA=10, MR=30;
+    const X=v=>40+Math.min(v,MA)/MA*(W-58), Y=v=>(H-30)-Math.min(v,MR)/MR*(H-50);
+    const acid=g=>g.ph!=null?Math.max(0,(7-g.ph)*2):null, ricch=g=>(g.grasso||0)+(g.zuccheri||0);
+    let gr='',pt='';
+    for(let a=2;a<=10;a+=4) gr+='<line x1="'+X(a)+'" y1="'+Y(0)+'" x2="'+X(a)+'" y2="16" stroke="rgba(255,255,255,0.07)"/><text x="'+X(a)+'" y="'+(Y(0)+13)+'" font-size="8" fill="var(--muted)" text-anchor="middle">'+a+'</text>';
+    for(let r=10;r<=30;r+=10) gr+='<line x1="'+X(0)+'" y1="'+Y(r)+'" x2="'+(W-14)+'" y2="'+Y(r)+'" stroke="rgba(255,255,255,0.07)"/><text x="'+(X(0)-4)+'" y="'+(Y(r)+3)+'" font-size="8" fill="var(--muted)" text-anchor="end">'+r+'</text>';
+    conDati.forEach((i,k)=>{ const a=acid(i.gusto); if(a==null) return; const x=X(a), y=Y(ricch(i.gusto));
+      pt+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="var(--teal-l)" opacity="0.85"/><text x="'+x+'" y="'+(y+3)+'" text-anchor="middle" font-size="8">'+i.icona+'</text><text x="'+x+'" y="'+(y+(k%2?18:-11))+'" text-anchor="middle" font-size="8" fill="var(--muted)">'+i.nome+'</text>'; });
+    h+='<div style="border:1px solid var(--border);border-radius:12px;padding:9px;background:var(--card);margin-bottom:8px"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block">'+gr
+      +'<line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+(W-14)+'" y2="'+Y(0)+'" stroke="var(--border)"/><line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+X(0)+'" y2="16" stroke="var(--border)"/>'
+      +'<text x="'+(W-14)+'" y="'+(H-6)+'" font-size="8" fill="var(--muted)" text-anchor="end">acidità (da pH)</text><text x="'+X(0)+'" y="11" font-size="8" fill="var(--muted)">ricchezza g/100g</text>'
+      +pt+'</svg><div style="font-size:0.58rem;color:var(--muted);margin-top:4px">acidità = (7 − pH) × 2 · ricchezza = grasso + zuccheri</div></div>';
   }
 
   h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
-
-  trio.forEach(i=>{
-    const g=i.gusto;
-    h+='<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06)">';
-    h+='<div style="display:flex;align-items:center;gap:7px;font-size:0.78rem"><span>'+i.icona+'</span><span style="flex:1">'+i.nome+'</span>';
-    if(g&&g.ph!=null) h+='<span style="font-size:0.62rem;color:var(--muted)">pH '+g.ph+'</span>';
-    h+='</div>';
+  ingr.forEach(i=>{ const g=i.gusto;
+    h+='<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06)"><div style="display:flex;align-items:center;gap:7px;font-size:0.76rem"><span>'+i.icona+'</span><span style="flex:1">'+i.nome+'</span>'+(g&&g.ph!=null?'<span style="font-size:0.62rem;color:var(--muted)">pH '+g.ph+'</span>':'')+'</div>';
     if(g&&g.fonteUSDA){
-      const bar=(v,max,col)=>'<div style="flex:1;height:8px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden"><div style="width:'+Math.min(100,Math.round((v||0)/max*100))+'%;height:100%;background:'+col+';border-radius:999px"></div></div>';
-      h+='<div style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:0.6rem;color:var(--muted)"><span style="width:44px">zucch.</span>'+bar(g.zuccheri,15,'#d05c6a')+'<span style="width:30px;text-align:right">'+(g.zuccheri??'—')+'g</span></div>';
-      h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px;font-size:0.6rem;color:var(--muted)"><span style="width:44px">grasso</span>'+bar(g.grasso,20,'#c9a84c')+'<span style="width:30px;text-align:right">'+(g.grasso??'—')+'g</span></div>';
-      h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px;font-size:0.6rem;color:var(--muted)"><span style="width:44px">umami</span>'+bar(g.glutammato_g,2,'#8a6fb0')+'<span style="width:30px;text-align:right">'+(g.glutammato_g??'—')+'g</span></div>';
-      h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:3px">fonte: '+g.fonteUSDA+' · per 100g</div>';
-    } else {
-      h+='<div style="font-size:0.65rem;color:var(--gold);margin-top:3px">dato USDA non ancora caricato per questo ingrediente</div>';
-    }
+      h+='<div style="font-size:0.62rem;color:var(--muted);margin-top:2px">grasso '+(g.grasso??'—')+'g · zuccheri '+(g.zuccheri??'—')+'g · glutammato '+(g.glutammato_g??'—')+'g</div>';
+    } else h+='<div style="font-size:0.62rem;color:var(--gold);margin-top:2px">dato gusto non ancora caricato</div>';
     h+='</div>';
   });
-  h+='</div>';
+  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">USDA FoodData Central + pH FDA · '+conDati.length+'/'+ingr.length+' con dato completo</div></div>';
 
-  if(conDati.length>=2){
-    const phVals=conDati.filter(i=>i.gusto.ph!=null).map(i=>i.gusto.ph);
-    const zucTot=conDati.reduce((s,i)=>s+(i.gusto.zuccheri||0),0);
-    const grTot=conDati.reduce((s,i)=>s+(i.gusto.grasso||0),0);
-    const gluTot=conDati.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
-    let nota='';
-    if(phVals.length>=2){
-      const spread=Math.max(...phVals)-Math.min(...phVals);
-      if(spread<0.8 && zucTot<3 && grTot<3) nota='Nessun ingrediente marcatamente acido o grasso nel trio: il piatto rischia di risultare piatto, poco contrasto.';
-      else if(spread>=2) nota='Buon divario di pH nel trio: c\'è una componente acida che può ravvivare le altre.';
+  p5.innerHTML=h+msSuggerisci();
+}
+
+// ── Cosa aggiungerei: colma il buco del gusto mantenendo il legame ──
+function msSuggerisci(){
+  const ingr=msPiatto.map(id=>msIng(id));
+  const conD=ingr.filter(i=>i.gusto&&i.gusto.fonteUSDA);
+  if(!conD.length) return '';
+  const phMin=Math.min(...conD.filter(i=>i.gusto.ph!=null).map(i=>i.gusto.ph),99);
+  const grTot=conD.reduce((s,i)=>s+(i.gusto.grasso||0),0);
+  const gluTot=conD.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
+  const buchi=[];
+  if(phMin>4.6) buchi.push('manca una componente acida che tagli');
+  if(grTot<3) buchi.push('manca grasso: il piatto resta magro');
+  if(gluTot<0.5) buchi.push('poco umami: rischia di sapere di poco');
+
+  const cand=MS.ingredienti.filter(i=>!msPiatto.includes(i.id)).map(i=>{
+    const g=i.gusto||{}; let colma=null;
+    if(g.fonteUSDA){
+      if(phMin>4.6 && g.ph!=null && g.ph<4.0) colma='porta acidità (pH '+g.ph+')';
+      else if(grTot<3 && (g.grasso||0)>5) colma='porta grasso ('+g.grasso+'g)';
+      else if(gluTot<0.5 && (g.glutammato_g||0)>0.3) colma='porta umami ('+g.glutammato_g+'g)';
     }
-    if(gluTot>1.5) nota += (nota?' ':'')+'Umami presente: il piatto ha già una base sapida.';
-    if(nota) h+='<div style="font-size:0.68rem;color:var(--teal-l);line-height:1.5;margin-top:10px">'+nota+'</div>';
-  }
-  h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:10px">dati reali USDA FoodData Central + tabella pH FDA · '+conDati.length+'/3 ingredienti con dato completo</div>';
-  p5.innerHTML='<div style="margin-top:6px">'+h+'</div>'+msSuggerisci();
+    return {i, legame:msLegame(i.id), colma};
+  });
+  const utili=cand.filter(c=>c.colma).sort((a,b)=>b.legame-a.legame).slice(0,3);
 
+  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">Cosa aggiungerei</div>';
+  h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
+  h+= buchi.length ? '<div style="font-size:0.68rem;color:var(--gold);line-height:1.5;margin-bottom:6px">'+buchi.map(b=>'• '+b).join('<br>')+'</div>'
+                   : '<div style="font-size:0.68rem;color:var(--success);margin-bottom:6px">Equilibrato sui dati disponibili.</div>';
+  // riga su due livelli: niente sovrapposizione su schermo stretto
+  h+=utili.map(c=>'<div style="padding:8px 0;border-top:1px solid rgba(255,255,255,0.06)">'
+      +'<div style="display:flex;align-items:center;gap:8px"><span>'+c.i.icona+'</span>'
+      +'<span style="flex:1;font-size:0.8rem;min-width:0">'+c.i.nome+'</span>'
+      +'<span style="font-size:0.66rem;color:var(--teal-l);white-space:nowrap">lega '+Math.round(c.legame*100)+'</span></div>'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-top:4px">'
+      +'<span style="flex:1;font-size:0.62rem;color:var(--gold);min-width:0">'+c.colma+'</span>'
+      +'<button class="btn btn-o" style="padding:4px 12px;font-size:0.68rem;margin:0;white-space:nowrap" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div></div>').join('');
+  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">"lega" = affinità col più debole del piatto</div></div>';
+  return h;
+}
+
+// ── Salvataggio ───────────────────────────────────────────
+function msRenderSalva(){
   const sv=document.getElementById('msSalva');
+  if(msPiatto.length<2){ sv.style.display='none'; return; }
   sv.style.display='block';
   sv.innerHTML='<div style="margin-top:12px"><label>Nome del piatto</label>'
-    +'<input type="text" id="msNomePiatto" placeholder="es. crudo di calamaro, carciofo e limone">'
+    +'<input type="text" id="msNomePiatto" placeholder="es. crudo di calamaro e carciofo">'
     +'<button class="btn btn-g" onclick="msSalvaPiatto()">💾 Salva piatto</button></div>';
 }
 
-// Salva il piatto su Firestore: cosi resta e puo essere riletto altrove.
 async function msSalvaPiatto(){
   const nome=(document.getElementById('msNomePiatto').value||'').trim();
   if(!nome){ alert('Dai un nome al piatto'); return; }
-  const trio=[msIng(msA),msIng(msB),msIng(msC)];
-  const rec={
-    nome, data:today(), ora:nowTime(),
-    ingredienti: trio.map(i=>({id:i.id, nome:i.nome, icona:i.icona,
-      gusto: i.gusto&&i.gusto.fonteUSDA ? {ph:i.gusto.ph, grasso:i.gusto.grasso, zuccheri:i.gusto.zuccheri, glutammato:i.gusto.glutammato_g} : null})),
-    pesce: msPesce||null,
-    ponti: [[msA,msB],[msB,msC],[msA,msC]].map(([x,y])=>{
-      const c=msCoppia(x,y);
-      return { tra:[msIng(x).nome, msIng(y).nome], molecole:c.c, jaccard:c.j, principali:(c.m||[]).slice(0,4).map(m=>m.n) };
-    }),
-  };
+  const ingr=msPiatto.map(id=>msIng(id));
+  const ponti=[];
+  for(let a=0;a<msPiatto.length;a++) for(let b=a+1;b<msPiatto.length;b++){
+    const c=msCoppia(msPiatto[a],msPiatto[b]);
+    ponti.push({tra:[msIng(msPiatto[a]).nome, msIng(msPiatto[b]).nome], molecole:c.c, jaccard:c.j, principali:(c.m||[]).slice(0,4).map(m=>m.n)});
+  }
+  const rec={ nome, data:today(), ora:nowTime(), pesce:msPesce||null,
+    ingredienti: ingr.map(i=>({id:i.id,nome:i.nome,icona:i.icona,
+      gusto:i.gusto&&i.gusto.fonteUSDA?{ph:i.gusto.ph,grasso:i.gusto.grasso,zuccheri:i.gusto.zuccheri,glutammato:i.gusto.glutammato_g}:null})),
+    ponti };
   try{
     const fdb=firestoreDb||firebase.firestore();
     await fdb.collection('piatti').doc(rec.data+'_'+nome.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40))
@@ -3243,71 +3260,14 @@ async function msSalvaPiatto(){
   }catch(e){ alert('Errore nel salvataggio: '+(e.message||e)); }
 }
 
-// Suggerisce il quarto elemento: deve legarsi ai tre per aroma (Jaccard minimo alto)
-// E colmare il buco del gusto (acidità, grasso o umami mancanti).
-function msSuggerisci(){
-  const trio=[msA,msB,msC].map(id=>msIng(id));
-  const conD=trio.filter(i=>i.gusto&&i.gusto.fonteUSDA);
-
-  // Cosa manca, sui dati reali disponibili
-  const phMin = Math.min(...conD.filter(i=>i.gusto.ph!=null).map(i=>i.gusto.ph), 99);
-  const grTot = conD.reduce((s,i)=>s+(i.gusto.grasso||0),0);
-  const gluTot= conD.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
-  const buchi=[];
-  if(phMin>4.6) buchi.push({k:'acido', txt:'manca una componente acida che tagli'});
-  if(grTot<3)   buchi.push({k:'grasso', txt:'manca grasso: il piatto resta magro'});
-  if(gluTot<0.5)buchi.push({k:'umami', txt:'poco umami: rischia di sapere di poco'});
-
-  const cand=MS.ingredienti.filter(i=>![msA,msB,msC].includes(i.id)).map(i=>{
-    const js=trio.map(t=>msCoppia(t.id,i.id).j);
-    const legame=Math.min(...js);            // deve legarsi al PIU DEBOLE dei tre
-    const g=i.gusto||{};
-    let colma=null;
-    if(g.fonteUSDA){
-      if(buchi.some(b=>b.k==='acido')  && g.ph!=null && g.ph<4.0) colma='porta acidità (pH '+g.ph+')';
-      else if(buchi.some(b=>b.k==='grasso') && (g.grasso||0)>5)   colma='porta grasso ('+g.grasso+'g)';
-      else if(buchi.some(b=>b.k==='umami')  && (g.glutammato_g||0)>0.3) colma='porta umami ('+g.glutammato_g+'g glutammato)';
-    }
-    return {i, legame, colma};
-  });
-
-  // prima quelli che colmano un buco, poi per forza di legame aromatico
-  const utili=cand.filter(c=>c.colma).sort((a,b)=>b.legame-a.legame).slice(0,3);
-  const soloAroma=cand.filter(c=>!c.colma).sort((a,b)=>b.legame-a.legame).slice(0,2);
-
-  let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 6px">6 · Cosa aggiungerei</div>';
-  h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
-  h+= buchi.length
-    ? '<div style="font-size:0.68rem;color:var(--gold);line-height:1.5;margin-bottom:8px">'+buchi.map(b=>'• '+b.txt).join('<br>')+'</div>'
-    : '<div style="font-size:0.68rem;color:var(--success);margin-bottom:8px">Il trio è già equilibrato sui dati disponibili.</div>';
-
-  const riga=(c,evid)=>'<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,0.06)">'
-    +'<span>'+c.i.icona+'</span><div style="flex:1;min-width:0"><div style="font-size:0.8rem">'+c.i.nome+'</div>'
-    +(c.colma?'<div style="font-size:0.62rem;color:'+(evid?'var(--gold)':'var(--muted)')+'">'+c.colma+'</div>':'')
-    +'</div><span style="font-size:0.66rem;color:var(--teal-l)">lega '+Math.round(c.legame*100)+'</span>'
-    +'<button class="btn btn-o" style="padding:3px 8px;font-size:0.66rem;margin:0" onclick="msScegliC('+c.i.id+')">prova</button></div>';
-
-  if(utili.length){ h+=utili.map(c=>riga(c,true)).join(''); }
-  if(soloAroma.length){
-    h+='<div style="font-size:0.62rem;color:var(--muted);margin-top:9px">più affini per aroma, ma non colmano il buco</div>';
-    h+=soloAroma.map(c=>riga(c,false)).join('');
-  }
-  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:9px">"lega" = affinità col più debole dei tre (Jaccard). Il consiglio usa solo ingredienti con dato gusto reale.</div>';
-  h+='</div>';
-  return h;
-}
-
-// Riapre un piatto salvato: rimette i tre ingredienti e il pesce nello stato di lavoro.
 function msApriPiatto(idsStr, pesce, docId){
-  const ids=idsStr.split(',').map(Number).filter(n=>!isNaN(n));
-  if(ids.length<3){ alert('Piatto incompleto'); return; }
-  msA=ids[0]; msB=ids[1]; msC=ids[2]; msPesce=pesce||null; msDocCorrente=docId||null;
-  msRenderGriglia();
-  msRenderPasso2();
-  msRenderPasso3(false);
-  msRenderPiatto();
+  const ids=idsStr.split(',').map(Number).filter(n=>!isNaN(n)&&msIng(n));
+  if(!ids.length){ alert('Piatto non ricostruibile'); return; }
+  msPiatto=ids; msPesce=pesce||null; msDocCorrente=docId||null;
+  msRenderTutto();
   const n=document.getElementById('msNomePiatto');
-  if(n && docId){ const nome=docId.split('_').slice(1).join('_').replace(/-/g,' '); n.value=nome; }
+  if(n && docId) n.value=docId.split('_').slice(1).join('_').replace(/-/g,' ');
+  document.getElementById('msPasso2').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 async function msEliminaPiatto(docId){
@@ -3329,13 +3289,11 @@ async function msRenderPiattiSalvati(){
     snap.forEach(d=>{ const p=d.data();
       const ids=(p.ingredienti||[]).map(i=>i.id).join(',');
       h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06)">'
-        +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:0.8rem">'+p.nome+'</div>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:0.8rem">'+p.nome+'</div>'
         +'<div style="font-size:0.64rem;color:var(--muted)">'+(p.ingredienti||[]).map(i=>i.icona+' '+i.nome).join(' · ')
-        +(p.pesce?' <span style="color:var(--gold)">+ '+p.pesce+'</span>':'')+' — '+fmtDate(p.data)+'</div></div>'
+        +(p.pesce?' <span style="color:var(--gold)">+ '+p.pesce+'</span>':'')+'</div></div>'
         +'<button class="btn btn-o" style="padding:4px 9px;font-size:0.68rem;margin:0" onclick="msApriPiatto(\''+ids+'\',\''+(p.pesce||'')+'\',\''+d.id+'\')">apri</button>'
-        +'<button class="btn btn-o" style="padding:4px 8px;font-size:0.68rem;margin:0" onclick="msEliminaPiatto(\''+d.id+'\')">✕</button>'
-        +'</div>';
+        +'<button class="btn btn-o" style="padding:4px 8px;font-size:0.68rem;margin:0" onclick="msEliminaPiatto(\''+d.id+'\')">✕</button></div>';
     });
     box.innerHTML=h;
   }catch(e){ console.warn('piatti:',e); }
