@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.8</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.10</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3007,7 +3007,7 @@ function msLegame(id){ return msPiatto.length ? Math.min(...msPiatto.map(x=>msCo
 function msAggiungi(id){ if(!msPiatto.includes(id)) msPiatto.push(id); msRenderTutto(); }
 function msTogli(id){ msPiatto=msPiatto.filter(x=>x!==id); msRenderTutto(); }
 function msAggiungiPesce(nome){ msPesce=(msPesce===nome?null:nome); msRenderTutto(); }
-function msReset(){ msPiatto=msIng(157)?[157]:[]; msPesce=null; msDocCorrente=null; msRenderTutto(); }
+function msReset(){ if(msPiatto.length && !confirm('Svuotare la selezione di tutti gli ingredienti?')) return; msPiatto=[]; msPesce=null; msDocCorrente=null; msRenderTutto(); }
 
 function msRenderTutto(){
   msRenderGriglia();
@@ -3033,7 +3033,7 @@ function msRenderPiattoCorrente(){
   const p2=document.getElementById('msPasso2');
   p2.style.display='block';
   if(!msPiatto.length){ p2.innerHTML='<div style="font-size:0.7rem;color:var(--muted);margin-top:12px">Nessun ingrediente: scegline uno sopra.</div>'; return; }
-  let h='<div style="font-size:0.72rem;color:var(--cream);margin:14px 0 6px">Il piatto — '+msPiatto.length+' ingredienti</div>';
+  let h='<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px"><span style="font-size:0.72rem;color:var(--cream)">Il piatto — '+msPiatto.length+' ingredienti</span><span onclick="msReset()" style="cursor:pointer;font-size:0.68rem;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px 9px">🗑️ svuota</span></div>';
   h+='<div style="display:flex;flex-wrap:wrap;gap:6px">'+msPiatto.map(id=>{
     const i=msIng(id);
     return '<span style="border:1px solid var(--teal-l);background:rgba(14,124,123,0.18);border-radius:999px;padding:5px 9px;font-size:0.74rem;display:inline-flex;align-items:center;gap:6px">'
