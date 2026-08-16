@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.17</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.18</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3029,7 +3029,7 @@ function msRenderGriglia(){
   const box=document.getElementById('msGriglia');
   const gruppi={};
   MS.ingredienti.forEach(i=>{ const c=i.categoria||'Altro'; (gruppi[c]=gruppi[c]||[]).push(i); });
-  const ordine=['Verdure e ortaggi','Frutta','Frutta secca e semi','Erbe aromatiche','Spezie','Formaggi e latticini','Funghi e tartufi','Condimenti e grassi','Bevande e infusi','Altro'];
+  const ordine=['Verdure e ortaggi','Frutta','Frutta secca e semi','Erbe aromatiche','Spezie','Formaggi e latticini','Funghi e tartufi','Condimenti e grassi','Oli essenziali e aromatici','Bevande e infusi','Altro'];
   box.innerHTML=ordine.filter(c=>gruppi[c]).map(cat=>{
     const ings=gruppi[cat];
     const nSel=ings.filter(i=>msPiatto.includes(i.id)).length;
