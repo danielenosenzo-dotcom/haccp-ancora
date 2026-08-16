@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.20</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.21</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3017,6 +3017,7 @@ function msRenderTutto(){
   msRenderPiattoCorrente();
   msRenderCandidati();
   msRenderPonti();
+  msRenderAvanguardia();
   msRenderVista();
   msRenderGusto();
   msRenderSalva();
@@ -3125,7 +3126,6 @@ function msRenderPonti(){
   }
   h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">numero = molecole aromatiche condivise · FlavorDB2</div></div>';
   p4.innerHTML=h;
-  msRenderAvanguardia();
 }
 
 // ── Abbinamenti d'avanguardia: ponti reali che attraversano categorie
@@ -3137,31 +3137,47 @@ function msRenderAvanguardia(){
   if(!box){ box=document.createElement('div'); box.id='msAvanguardia'; document.getElementById('msPasso4').insertAdjacentElement('afterend', box); }
   if(msPiatto.length<1){ box.innerHTML=''; return; }
   const catPiatto=new Set(msPiatto.map(id=>msIng(id).categoria));
+
+  // Punteggio combinato, dichiarato: 35% aroma (Jaccard reale) + 65% gusto (colma un
+  // vuoto misurabile di grasso/umami, stesse soglie di "Cosa aggiungerei" — non un
+  // nuovo criterio inventato). I pesi sono una scelta editoriale nostra, non uno
+  // standard esterno: per questo restano scritti in chiaro, non nascosti nel numero.
+  const conDpiatto=msPiatto.map(id=>msIng(id)).filter(i=>i.gusto&&i.gusto.fonteUSDA);
+  const grTotP=conDpiatto.reduce((s,i)=>s+(i.gusto.grasso||0),0);
+  const gluTotP=conDpiatto.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
+
   const cand=MS.ingredienti.filter(i=>!msPiatto.includes(i.id) && !catPiatto.has(i.categoria)).map(i=>{
     const legame=msLegame(i.id);
     let migliore=null;
     msPiatto.forEach(pid=>{ const c=msCoppia(pid,i.id); if(!migliore||c.j>migliore.c.j) migliore={ing:msIng(pid),c}; });
-    return {i, legame, migliore};
-  }).filter(c=>c.legame>0.08).sort((a,b)=>b.legame-a.legame).slice(0,4);
+    const g=i.gusto||{}; let gustoNota=null, gustoPunti=0;
+    if(g.fonteUSDA){
+      if(grTotP<3 && (g.grasso||0)>5){ gustoNota='porta grasso ('+g.grasso+'g)'; gustoPunti=100; }
+      else if(gluTotP<0.5 && (g.glutammato_g||0)>0.3){ gustoNota='porta umami ('+g.glutammato_g+'g)'; gustoPunti=100; }
+    }
+    const punteggio=legame*100*0.35 + gustoPunti*0.65;
+    return {i, legame, migliore, gustoNota, punteggio};
+  }).filter(c=>c.legame>0.08).sort((a,b)=>b.punteggio-a.punteggio).slice(0,4);
 
   let h='<div style="font-size:0.72rem;color:var(--gold-l);margin:16px 0 6px">✦ Abbinamenti d\'avanguardia</div>';
   h+='<div style="border:1px solid var(--border-gold, rgba(201,168,76,0.3));border-radius:12px;padding:11px;background:linear-gradient(135deg,rgba(201,168,76,0.06),transparent)">';
-  h+='<div style="font-size:0.66rem;color:var(--muted);margin-bottom:8px">Non i vicini di casa — ponti reali verso categorie che il piatto non ha ancora toccato.</div>';
+  h+='<div style="font-size:0.66rem;color:var(--muted);margin-bottom:8px">Non i vicini di casa — ponti reali verso categorie che il piatto non ha ancora toccato. Ordinati per punteggio: 35% aroma + 65% quanto colmano un vuoto di gusto misurabile.</div>';
   if(cand.length){
     h+=cand.map(c=>{
       const mol=(c.migliore.c.m||[]).slice(0,2).map(m=>m.n).join(', ');
       return '<div style="padding:8px 0;border-top:1px solid rgba(201,168,76,0.15)">'
         +'<div style="display:flex;align-items:flex-start;gap:8px"><span style="font-size:1.05rem;line-height:1.3">'+c.i.icona+'</span>'
         +'<span style="flex:1;min-width:0"><b style="font-size:0.8rem;line-height:1.3">'+c.i.nome+'</b><div style="font-size:0.6rem;color:var(--muted)">'+c.i.categoria+'</div></span>'
-        +'<span style="font-size:0.62rem;color:var(--gold-l);font-weight:600;white-space:nowrap;line-height:1.3">'+Math.round(c.legame*100)+'% legame</span>'
+        +'<span style="font-size:0.72rem;color:var(--gold-l);font-weight:700;white-space:nowrap;line-height:1.3">'+Math.round(c.punteggio)+'</span>'
         +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0;flex-shrink:0" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>'
-        +(mol?'<div style="font-size:0.62rem;color:var(--muted);margin-top:4px;padding-left:29px">ponte con '+c.migliore.ing.nome+' via '+mol+'</div>':'')
+        +'<div style="font-size:0.6rem;color:var(--muted);margin-top:4px;padding-left:29px">aroma '+Math.round(c.legame*100)+'% · gusto: '+(c.gustoNota||'nessun vuoto colmato')+'</div>'
+        +(mol?'<div style="font-size:0.62rem;color:var(--muted);margin-top:2px;padding-left:29px">ponte con '+c.migliore.ing.nome+' via '+mol+'</div>':'')
         +'</div>';
     }).join('');
   } else {
     h+='<div style="font-size:0.62rem;color:var(--muted)">Nessun ponte abbastanza forte fuori dalle categorie già presenti — il piatto è già "concentrato" su un registro coerente.</div>';
   }
-  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">stesso indice di Jaccard degli altri abbinamenti, filtrato solo per categoria diversa da quelle già nel piatto</div></div>';
+  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">formula nostra, dichiarata: non è uno standard esterno come il pH o il Jaccard, solo pesi scelti da noi</div></div>';
   box.innerHTML=h;
 }
 
