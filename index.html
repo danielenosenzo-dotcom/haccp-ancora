@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.19</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.20</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3151,10 +3151,10 @@ function msRenderAvanguardia(){
     h+=cand.map(c=>{
       const mol=(c.migliore.c.m||[]).slice(0,2).map(m=>m.n).join(', ');
       return '<div style="padding:8px 0;border-top:1px solid rgba(201,168,76,0.15)">'
-        +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.05rem">'+c.i.icona+'</span>'
-        +'<span style="flex:1;min-width:0"><b style="font-size:0.8rem">'+c.i.nome+'</b><div style="font-size:0.6rem;color:var(--muted)">'+c.i.categoria+'</div></span>'
-        +'<span style="font-size:0.68rem;color:var(--gold-l);font-weight:600">'+Math.round(c.legame*100)+'</span>'
-        +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>'
+        +'<div style="display:flex;align-items:flex-start;gap:8px"><span style="font-size:1.05rem;line-height:1.3">'+c.i.icona+'</span>'
+        +'<span style="flex:1;min-width:0"><b style="font-size:0.8rem;line-height:1.3">'+c.i.nome+'</b><div style="font-size:0.6rem;color:var(--muted)">'+c.i.categoria+'</div></span>'
+        +'<span style="font-size:0.62rem;color:var(--gold-l);font-weight:600;white-space:nowrap;line-height:1.3">'+Math.round(c.legame*100)+'% legame</span>'
+        +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0;flex-shrink:0" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>'
         +(mol?'<div style="font-size:0.62rem;color:var(--muted);margin-top:4px;padding-left:29px">ponte con '+c.migliore.ing.nome+' via '+mol+'</div>':'')
         +'</div>';
     }).join('');
