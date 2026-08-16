@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.18</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.19</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3125,6 +3125,44 @@ function msRenderPonti(){
   }
   h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">numero = molecole aromatiche condivise · FlavorDB2</div></div>';
   p4.innerHTML=h;
+  msRenderAvanguardia();
+}
+
+// ── Abbinamenti d'avanguardia: ponti reali che attraversano categorie
+// diverse (non "verdura con verdura") — la parte più sperimentale della
+// matrice. Filtra per categoria assente dal piatto, poi ordina per legame
+// reale: niente proposto a sensazione, solo se le molecole lo confermano.
+function msRenderAvanguardia(){
+  let box=document.getElementById('msAvanguardia');
+  if(!box){ box=document.createElement('div'); box.id='msAvanguardia'; document.getElementById('msPasso4').insertAdjacentElement('afterend', box); }
+  if(msPiatto.length<1){ box.innerHTML=''; return; }
+  const catPiatto=new Set(msPiatto.map(id=>msIng(id).categoria));
+  const cand=MS.ingredienti.filter(i=>!msPiatto.includes(i.id) && !catPiatto.has(i.categoria)).map(i=>{
+    const legame=msLegame(i.id);
+    let migliore=null;
+    msPiatto.forEach(pid=>{ const c=msCoppia(pid,i.id); if(!migliore||c.j>migliore.c.j) migliore={ing:msIng(pid),c}; });
+    return {i, legame, migliore};
+  }).filter(c=>c.legame>0.08).sort((a,b)=>b.legame-a.legame).slice(0,4);
+
+  let h='<div style="font-size:0.72rem;color:var(--gold-l);margin:16px 0 6px">✦ Abbinamenti d\'avanguardia</div>';
+  h+='<div style="border:1px solid var(--border-gold, rgba(201,168,76,0.3));border-radius:12px;padding:11px;background:linear-gradient(135deg,rgba(201,168,76,0.06),transparent)">';
+  h+='<div style="font-size:0.66rem;color:var(--muted);margin-bottom:8px">Non i vicini di casa — ponti reali verso categorie che il piatto non ha ancora toccato.</div>';
+  if(cand.length){
+    h+=cand.map(c=>{
+      const mol=(c.migliore.c.m||[]).slice(0,2).map(m=>m.n).join(', ');
+      return '<div style="padding:8px 0;border-top:1px solid rgba(201,168,76,0.15)">'
+        +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.05rem">'+c.i.icona+'</span>'
+        +'<span style="flex:1;min-width:0"><b style="font-size:0.8rem">'+c.i.nome+'</b><div style="font-size:0.6rem;color:var(--muted)">'+c.i.categoria+'</div></span>'
+        +'<span style="font-size:0.68rem;color:var(--gold-l);font-weight:600">'+Math.round(c.legame*100)+'</span>'
+        +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>'
+        +(mol?'<div style="font-size:0.62rem;color:var(--muted);margin-top:4px;padding-left:29px">ponte con '+c.migliore.ing.nome+' via '+mol+'</div>':'')
+        +'</div>';
+    }).join('');
+  } else {
+    h+='<div style="font-size:0.62rem;color:var(--muted)">Nessun ponte abbastanza forte fuori dalle categorie già presenti — il piatto è già "concentrato" su un registro coerente.</div>';
+  }
+  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">stesso indice di Jaccard degli altri abbinamenti, filtrato solo per categoria diversa da quelle già nel piatto</div></div>';
+  box.innerHTML=h;
 }
 
 // ── Vista del piatto + innesto pesce ──────────────────────
