@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.22</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.23</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3200,7 +3200,11 @@ function msRenderMappa3D(){
     box=document.createElement('div'); box.id='msMappa3D';
     document.getElementById('msAvanguardia').insertAdjacentElement('afterend', box);
     box.style.cssText='border:1px solid var(--border);border-radius:12px;margin:16px 0 0;background:var(--card);overflow:hidden;position:relative';
-    box.innerHTML='<div style="padding:9px 12px 0;font-size:0.72rem;color:var(--cream)">Mappa del piatto <span style="color:var(--muted)">(trascina per ruotare · tocca un nodo)</span></div><canvas id="ms3dCanvas" style="width:100%;height:230px;display:block;touch-action:none;cursor:grab"></canvas>';
+    box.innerHTML='<div style="padding:9px 12px 0;font-size:0.72rem;color:var(--cream)">Mappa del piatto <span style="color:var(--muted)">(trascina per ruotare)</span></div>'
+      +'<div style="padding:4px 12px 0;font-size:0.6rem;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap">'
+      +'<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal-l);vertical-align:middle;margin-right:4px"></span>nel piatto — tocca per togliere</span>'
+      +'<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;border:1px dashed var(--muted);vertical-align:middle;margin-right:4px"></span>non ancora scelto — tocca per aggiungere</span>'
+      +'</div><canvas id="ms3dCanvas" style="width:100%;height:230px;display:block;touch-action:none;cursor:grab"></canvas>';
     MS3D.box=box; MS3D.canvas=document.getElementById('ms3dCanvas'); MS3D.ctx=MS3D.canvas.getContext('2d');
     ms3dSetupEventi();
   }
