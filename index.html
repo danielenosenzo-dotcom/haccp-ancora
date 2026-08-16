@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.15</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.16</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3163,18 +3163,29 @@ function msRenderGusto(){
   let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">Bilanciamento — gusto molecolare</div>';
 
   if(conDati.length){
-    const W=300,H=190, MA=10, MR=30;
-    const X=v=>40+Math.min(v,MA)/MA*(W-58), Y=v=>(H-30)-Math.min(v,MR)/MR*(H-50);
-    const acid=g=>g.ph!=null?Math.max(0,(7-g.ph)*2):null, ricch=g=>(g.grasso||0)+(g.zuccheri||0);
-    let gr='',pt='';
-    for(let a=2;a<=10;a+=4) gr+='<line x1="'+X(a)+'" y1="'+Y(0)+'" x2="'+X(a)+'" y2="16" stroke="rgba(255,255,255,0.07)"/><text x="'+X(a)+'" y="'+(Y(0)+13)+'" font-size="8" fill="var(--muted)" text-anchor="middle">'+a+'</text>';
-    for(let r=10;r<=30;r+=10) gr+='<line x1="'+X(0)+'" y1="'+Y(r)+'" x2="'+(W-14)+'" y2="'+Y(r)+'" stroke="rgba(255,255,255,0.07)"/><text x="'+(X(0)-4)+'" y="'+(Y(r)+3)+'" font-size="8" fill="var(--muted)" text-anchor="end">'+r+'</text>';
-    conDati.forEach((i,k)=>{ const a=acid(i.gusto); if(a==null) return; const x=X(a), y=Y(ricch(i.gusto));
-      pt+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="var(--teal-l)" opacity="0.85"/><text x="'+x+'" y="'+(y+3)+'" text-anchor="middle" font-size="8">'+i.icona+'</text><text x="'+x+'" y="'+(y+(k%2?18:-11))+'" text-anchor="middle" font-size="8" fill="var(--muted)">'+i.nome+'</text>'; });
-    h+='<div style="border:1px solid var(--border);border-radius:12px;padding:9px;background:var(--card);margin-bottom:8px"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block">'+gr
-      +'<line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+(W-14)+'" y2="'+Y(0)+'" stroke="var(--border)"/><line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+X(0)+'" y2="16" stroke="var(--border)"/>'
-      +'<text x="'+(W-14)+'" y="'+(H-6)+'" font-size="8" fill="var(--muted)" text-anchor="end">acidità (da pH)</text><text x="'+X(0)+'" y="11" font-size="8" fill="var(--muted)">ricchezza g/100g</text>'
-      +pt+'</svg><div style="font-size:0.58rem;color:var(--muted);margin-top:4px">acidità = (7 − pH) × 2 · ricchezza = grasso + zuccheri</div></div>';
+    // Risultato del piatto intero, non ingrediente per ingrediente: 4 barre dirette,
+    // niente formule da decodificare. Grasso/zuccheri/glutammato sono somme sul piatto
+    // (trattando ogni ingrediente come presente in quantità equivalente — non abbiamo
+    // ancora le grammature reali). L'acidità mostra il pH più basso tra gli ingredienti
+    // presenti: è un valore reale letto direttamente, non una media calcolata.
+    const conPh=conDati.filter(i=>i.gusto.ph!=null);
+    const phPiu=conPh.length? conPh.reduce((m,i)=>i.gusto.ph<m.gusto.ph?i:m) : null;
+    const grTotP=conDati.reduce((s,i)=>s+(i.gusto.grasso||0),0);
+    const zucTotP=conDati.reduce((s,i)=>s+(i.gusto.zuccheri||0),0);
+    const gluTotP=conDati.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
+    const barre=[
+      {label:'Acidità più marcata', val:phPiu?Math.max(0,(7-phPiu.gusto.ph)*14):0, max:100, testo:phPiu?('pH '+phPiu.gusto.ph+' ('+phPiu.icona+' '+phPiu.nome+')'):'nessun dato pH', colore:'var(--danger)'},
+      {label:'Grasso totale', val:grTotP, max:60, testo:grTotP.toFixed(1)+' g', colore:'var(--gold)'},
+      {label:'Zuccheri totali', val:zucTotP, max:40, testo:zucTotP.toFixed(1)+' g', colore:'var(--teal-l)'},
+      {label:'Umami (glutammato)', val:gluTotP, max:5, testo:gluTotP.toFixed(2)+' g', colore:'var(--success)'}
+    ];
+    h+='<div style="border:1px solid var(--border);border-radius:12px;padding:13px;background:var(--card);margin-bottom:8px">'
+      +'<div style="font-size:0.66rem;color:var(--muted);margin-bottom:10px">Risultato del piatto intero (somma degli ingredienti selezionati)</div>'
+      +barre.map(b=>{ const pct=Math.min(100,(b.val/b.max)*100);
+        return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:0.68rem;margin-bottom:3px"><span style="color:var(--muted)">'+b.label+'</span><span>'+b.testo+'</span></div>'
+          +'<div style="height:7px;border-radius:99px;background:rgba(138,160,173,0.18);overflow:hidden"><div style="height:100%;border-radius:99px;width:'+pct+'%;background:'+b.colore+'"></div></div></div>';
+      }).join('')
+      +'<div style="font-size:0.58rem;color:var(--muted);margin-top:2px">grasso/zuccheri/umami sono somme a parità di quantità (non hai ancora indicato le grammature) · acidità = il pH più basso realmente presente, non una media</div></div>';
   }
 
   h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
