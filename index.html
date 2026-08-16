@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.14</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.15</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3195,26 +3195,21 @@ function msSuggerisci(){
   const ingr=msPiatto.map(id=>msIng(id));
   const conD=ingr.filter(i=>i.gusto&&i.gusto.fonteUSDA);
   if(!conD.length) return '';
-  const phMin=Math.min(...conD.filter(i=>i.gusto.ph!=null).map(i=>i.gusto.ph),99);
   const grTot=conD.reduce((s,i)=>s+(i.gusto.grasso||0),0);
   const gluTot=conD.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
   const buchi=[];
-  if(phMin>4.6) buchi.push('manca una componente acida che tagli');
   if(grTot<3) buchi.push('manca grasso: il piatto resta magro');
   if(gluTot<0.5) buchi.push('poco umami: rischia di sapere di poco');
-
-  // Registro del piatto: se non contiene già frutta/bevande dolci, evita di proporle
-  // solo per colmare l'acidità quando esistono alternative "salate" (aceto, capperi, ecc.) —
-  // altrimenti un pesto si vede suggerire ananas o uva, aromaticamente vero ma fuori contesto.
-  const piattoDolce = ingr.some(i=>i.categoria==='Frutta' || i.categoria==='Bevande e infusi');
-  const esisteAcidoSalato = MS.ingredienti.some(i=>i.gusto&&i.gusto.fonteUSDA&&i.gusto.ph!=null&&i.gusto.ph<4.0&&i.categoria!=='Frutta'&&i.categoria!=='Bevande e infusi');
+  // Niente soglia automatica sull'acidità: pH>4.6 è il limite di sicurezza FDA per la
+  // conservazione (bassa acidità/rischio botulino), non un criterio di gusto — un piatto
+  // salato "completo" (es. pesto: basilico, pinoli, parmigiano, olio) non ha mai bisogno
+  // di un tocco acido per essere equilibrato. Il pH resta visibile ingrediente per
+  // ingrediente più sotto, solo come informazione, senza giudizio.
 
   const cand=MS.ingredienti.filter(i=>!msPiatto.includes(i.id)).map(i=>{
     const g=i.gusto||{}; let colma=null;
-    const fruttaODolce = i.categoria==='Frutta' || i.categoria==='Bevande e infusi';
     if(g.fonteUSDA){
-      if(phMin>4.6 && g.ph!=null && g.ph<4.0 && (!fruttaODolce || piattoDolce || !esisteAcidoSalato)) colma='porta acidità (pH '+g.ph+')';
-      else if(grTot<3 && (g.grasso||0)>5) colma='porta grasso ('+g.grasso+'g)';
+      if(grTot<3 && (g.grasso||0)>5) colma='porta grasso ('+g.grasso+'g)';
       else if(gluTot<0.5 && (g.glutammato_g||0)>0.3) colma='porta umami ('+g.glutammato_g+'g)';
     }
     return {i, legame:msLegame(i.id), colma};
