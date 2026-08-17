@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.29</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.30</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -2986,6 +2986,24 @@ function initApp(){
 // Fonte: FlavorDB2 (CC BY-NC-SA) · gusto: USDA FoodData Central + pH FDA.
 // ═══════════════════════════════════════════════════════
 let MS=null, msDocCorrente=null, msPiatto=[], msPesce=null;
+// Quantità per ingrediente: {[id]: grammi_o_ml}. Default 100 — finché non la
+// tocchi, i calcoli restano identici a prima (nessuna rottura sui piatti già
+// salvati senza quantità). Solo dopo la modifica pesano davvero sul gusto.
+let msQuantita={};
+function msUnita(id){
+  const i=msIng(id); if(!i) return 'g';
+  const nome=(i.nome||'').toLowerCase();
+  const liquido=/olio|aceto|vino|panna|latte|succo|brodo/.test(nome) || i.categoria==='Bevande e infusi';
+  return liquido ? 'ml' : 'g';
+}
+function msCambiaQuantita(id, val){
+  const n=Math.max(0, Math.min(2000, Number(val)||0));
+  msQuantita[id]=n;
+  msRenderGusto();
+  msRenderMappa3D();
+}
+// I dati USDA sono per 100g/100ml: il fattore riporta il contributo alla quantità reale.
+function msFattore(id){ return (msQuantita[id]!=null?msQuantita[id]:100)/100; }
 
 async function msInit(){
   const stato=document.getElementById('msStato');
@@ -3007,10 +3025,10 @@ function msCoppia(a,b){ a=msAromaId(a); b=msAromaId(b); if(a===b) return {j:0,c:
 // forza di legame di un candidato col piatto = affinita col PIU DEBOLE dei presenti
 function msLegame(id){ return msPiatto.length ? Math.min(...msPiatto.map(x=>msCoppia(x,id).j)) : 0; }
 
-function msAggiungi(id){ if(!msPiatto.includes(id)) msPiatto.push(id); msRenderTutto(); }
-function msTogli(id){ msPiatto=msPiatto.filter(x=>x!==id); msRenderTutto(); }
+function msAggiungi(id){ if(!msPiatto.includes(id)){ msPiatto.push(id); msQuantita[id]=100; } msRenderTutto(); }
+function msTogli(id){ msPiatto=msPiatto.filter(x=>x!==id); delete msQuantita[id]; msRenderTutto(); }
 function msAggiungiPesce(nome){ msPesce=(msPesce===nome?null:nome); msRenderTutto(); }
-function msReset(){ if(msPiatto.length && !confirm('Svuotare la selezione di tutti gli ingredienti?')) return; msPiatto=[]; msPesce=null; msDocCorrente=null; msRenderTutto(); }
+function msReset(){ if(msPiatto.length && !confirm('Svuotare la selezione di tutti gli ingredienti?')) return; msPiatto=[]; msQuantita={}; msPesce=null; msDocCorrente=null; msRenderTutto(); }
 
 function msRenderTutto(){
   msRenderGriglia();
@@ -3058,10 +3076,15 @@ function msRenderPiattoCorrente(){
   p2.style.display='block';
   if(!msPiatto.length){ p2.innerHTML='<div style="font-size:0.7rem;color:var(--muted);margin-top:12px">Nessun ingrediente: scegline uno sopra.</div>'; return; }
   let h='<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px"><span style="font-size:0.72rem;color:var(--cream)">Il piatto — '+msPiatto.length+' ingredienti</span><span onclick="msReset()" style="cursor:pointer;font-size:0.68rem;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px 9px">🗑️ svuota</span></div>';
-  h+='<div style="display:flex;flex-wrap:wrap;gap:6px">'+msPiatto.map(id=>{
+  h+='<div style="display:flex;flex-direction:column;gap:6px">'+msPiatto.map(id=>{
     const i=msIng(id);
-    return '<span style="border:1px solid var(--teal-l);background:rgba(14,124,123,0.18);border-radius:999px;padding:5px 9px;font-size:0.74rem;display:inline-flex;align-items:center;gap:6px">'
-      +i.icona+' '+i.nome+'<span onclick="msTogli('+id+')" style="cursor:pointer;opacity:0.65;font-size:0.8rem">✕</span></span>';
+    const unita=msUnita(id);
+    const q=msQuantita[id]!=null?msQuantita[id]:100;
+    return '<div style="border:1px solid var(--teal-l);background:rgba(14,124,123,0.12);border-radius:10px;padding:6px 9px;display:flex;align-items:center;gap:8px;font-size:0.74rem">'
+      +'<span style="flex:1;min-width:0">'+i.icona+' '+i.nome+'</span>'
+      +'<input type="number" min="0" max="2000" step="'+(unita==='ml'?'5':'5')+'" value="'+q+'" onchange="msCambiaQuantita('+id+',this.value)" style="width:56px;padding:3px 5px;font-size:0.72rem;text-align:right;border:1px solid var(--border);border-radius:6px;background:var(--navy);color:var(--cream)">'
+      +'<span style="color:var(--muted);font-size:0.68rem;width:16px">'+unita+'</span>'
+      +'<span onclick="msTogli('+id+')" style="cursor:pointer;opacity:0.65;font-size:0.8rem;padding:0 2px">✕</span></div>';
   }).join('')+'</div>';
   p2.innerHTML=h;
 }
@@ -3143,9 +3166,9 @@ function msRenderAvanguardia(){
   // vuoto misurabile di grasso/umami, stesse soglie di "Cosa aggiungerei" — non un
   // nuovo criterio inventato). I pesi sono una scelta editoriale nostra, non uno
   // standard esterno: per questo restano scritti in chiaro, non nascosti nel numero.
-  const conDpiatto=msPiatto.map(id=>msIng(id)).filter(i=>i.gusto&&i.gusto.fonteUSDA);
-  const grTotP=conDpiatto.reduce((s,i)=>s+(i.gusto.grasso||0),0);
-  const gluTotP=conDpiatto.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
+  const conDpiatto=msPiatto.filter(id=>{const i=msIng(id); return i.gusto&&i.gusto.fonteUSDA;});
+  const grTotP=conDpiatto.reduce((s,id)=>s+(msIng(id).gusto.grasso||0)*msFattore(id),0);
+  const gluTotP=conDpiatto.reduce((s,id)=>s+(msIng(id).gusto.glutammato_g||0)*msFattore(id),0);
 
   const cand=MS.ingredienti.filter(i=>!msPiatto.includes(i.id) && !catPiatto.has(i.categoria)).map(i=>{
     const legame=msLegame(i.id);
@@ -3234,13 +3257,14 @@ function msRenderMappa3D(){
   // piatto avrà la pallina più grande; chi pesa poco resta piccolo, anche se
   // aromaticamente è ben legato (quello lo mostra invece lo spessore del raggio).
   const conGusto=MS3D.nodes.filter(n=>!n.centro && n.ing.gusto && n.ing.gusto.fonteUSDA);
-  const totGusto=conGusto.reduce((s,n)=>{ const g=n.ing.gusto; return s+(g.grasso||0)+(g.zuccheri||0)+(g.glutammato_g||0); },0);
+  const pesoAssoluto=n=>{ const g=n.ing.gusto; return ((g.grasso||0)+(g.zuccheri||0)+(g.glutammato_g||0))*msFattore(n.id); };
+  const totGusto=conGusto.reduce((s,n)=>s+pesoAssoluto(n),0);
   const nIngr=MS3D.nodes.filter(n=>!n.centro).length || 1;
   MS3D.nodes.forEach(n=>{
     if(n.centro) return;
     const g=n.ing.gusto;
     if(g && g.fonteUSDA && totGusto>0){
-      const quota=((g.grasso||0)+(g.zuccheri||0)+(g.glutammato_g||0))/totGusto;
+      const quota=pesoAssoluto(n)/totGusto;
       n.pesoGusto=quota/(1/nIngr); // 1 = quota media, >1 pesa più della media, <1 meno
     } else n.pesoGusto=1;
   });
@@ -3248,8 +3272,9 @@ function msRenderMappa3D(){
   // Equilibrio del centro: stesse soglie oggettive di "Cosa aggiungerei" (grasso≥3g,
   // umami≥0.5g), non un punteggio a sensazione — 0 = nessuna soglia raggiunta,
   // 1 = entrambe raggiunte. Il centro cresce quando il piatto è "completo" su questi assi.
-  const grTot=conGusto.reduce((s,n)=>s+(n.ing.gusto.grasso||0),0);
-  const gluTot=conGusto.reduce((s,n)=>s+(n.ing.gusto.glutammato_g||0),0);
+  // Pesato per le quantità reali, non più "come se ognuno pesasse 100g".
+  const grTot=conGusto.reduce((s,n)=>s+(n.ing.gusto.grasso||0)*msFattore(n.id),0);
+  const gluTot=conGusto.reduce((s,n)=>s+(n.ing.gusto.glutammato_g||0)*msFattore(n.id),0);
   const equilibrio=(Math.min(1,grTot/3)+Math.min(1,gluTot/0.5))/2;
   const centro=ms3dCentro();
   if(centro){
@@ -3472,56 +3497,56 @@ function msRenderGusto(){
   if(!msPiatto.length){ p5.style.display='none'; return; }
   p5.style.display='block';
   const ingr=msPiatto.map(id=>msIng(id));
-  const conDati=ingr.filter(i=>i.gusto&&i.gusto.fonteUSDA);
+  const idConDati=msPiatto.filter(id=>{const i=msIng(id); return i.gusto&&i.gusto.fonteUSDA;});
 
   let h='<div style="font-size:0.72rem;color:var(--cream);margin:16px 0 8px">Bilanciamento — gusto molecolare</div>';
 
-  if(conDati.length){
-    // Risultato del piatto intero, non ingrediente per ingrediente: 4 barre dirette,
-    // niente formule da decodificare. Grasso/zuccheri/glutammato sono somme sul piatto
-    // (trattando ogni ingrediente come presente in quantità equivalente — non abbiamo
-    // ancora le grammature reali). L'acidità mostra il pH più basso tra gli ingredienti
-    // presenti: è un valore reale letto direttamente, non una media calcolata.
-    const conPh=conDati.filter(i=>i.gusto.ph!=null);
-    const phPiu=conPh.length? conPh.reduce((m,i)=>i.gusto.ph<m.gusto.ph?i:m) : null;
-    const grTotP=conDati.reduce((s,i)=>s+(i.gusto.grasso||0),0);
-    const zucTotP=conDati.reduce((s,i)=>s+(i.gusto.zuccheri||0),0);
-    const gluTotP=conDati.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
+  if(idConDati.length){
+    // Risultato del piatto intero, pesato sulle grammature reali che hai indicato
+    // (non più "come se ogni ingrediente pesasse 100g"). L'acidità mostra il pH più
+    // basso tra gli ingredienti presenti: è un valore reale letto direttamente,
+    // non una media calcolata — le quantità non lo alterano.
+    const conPh=idConDati.filter(id=>msIng(id).gusto.ph!=null);
+    const phPiu=conPh.length? conPh.reduce((m,id)=>msIng(id).gusto.ph<msIng(m).gusto.ph?id:m) : null;
+    const grTotP=idConDati.reduce((s,id)=>s+(msIng(id).gusto.grasso||0)*msFattore(id),0);
+    const zucTotP=idConDati.reduce((s,id)=>s+(msIng(id).gusto.zuccheri||0)*msFattore(id),0);
+    const gluTotP=idConDati.reduce((s,id)=>s+(msIng(id).gusto.glutammato_g||0)*msFattore(id),0);
+    const phIng=phPiu!=null?msIng(phPiu):null;
     const barre=[
-      {label:'Acidità più marcata', val:phPiu?Math.max(0,(7-phPiu.gusto.ph)*14):0, max:100, testo:phPiu?('pH '+phPiu.gusto.ph+' ('+phPiu.icona+' '+phPiu.nome+')'):'nessun dato pH', colore:'var(--danger)'},
+      {label:'Acidità più marcata', val:phIng?Math.max(0,(7-phIng.gusto.ph)*14):0, max:100, testo:phIng?('pH '+phIng.gusto.ph+' ('+phIng.icona+' '+phIng.nome+')'):'nessun dato pH', colore:'var(--danger)'},
       {label:'Grasso totale', val:grTotP, max:60, testo:grTotP.toFixed(1)+' g', colore:'var(--gold)'},
       {label:'Zuccheri totali', val:zucTotP, max:40, testo:zucTotP.toFixed(1)+' g', colore:'var(--teal-l)'},
       {label:'Umami (glutammato)', val:gluTotP, max:5, testo:gluTotP.toFixed(2)+' g', colore:'var(--success)'}
     ];
     h+='<div style="border:1px solid var(--border);border-radius:12px;padding:13px;background:var(--card);margin-bottom:8px">'
-      +'<div style="font-size:0.66rem;color:var(--muted);margin-bottom:10px">Risultato del piatto intero (somma degli ingredienti selezionati)</div>'
+      +'<div style="font-size:0.66rem;color:var(--muted);margin-bottom:10px">Risultato del piatto intero, pesato sulle quantità indicate sopra</div>'
       +barre.map(b=>{ const pct=Math.min(100,(b.val/b.max)*100);
         return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:0.68rem;margin-bottom:3px"><span style="color:var(--muted)">'+b.label+'</span><span>'+b.testo+'</span></div>'
           +'<div style="height:7px;border-radius:99px;background:rgba(138,160,173,0.18);overflow:hidden"><div style="height:100%;border-radius:99px;width:'+pct+'%;background:'+b.colore+'"></div></div></div>';
       }).join('')
-      +'<div style="font-size:0.58rem;color:var(--muted);margin-top:2px">grasso/zuccheri/umami sono somme a parità di quantità (non hai ancora indicato le grammature) · acidità = il pH più basso realmente presente, non una media</div></div>';
+      +'<div style="font-size:0.58rem;color:var(--muted);margin-top:2px">grasso/zuccheri/umami = somma pesata su quantità reali · acidità = il pH più basso realmente presente, non una media</div></div>';
   }
 
   h+='<div style="border:1px solid var(--border);border-radius:12px;padding:11px;background:var(--card)">';
-  ingr.forEach(i=>{ const g=i.gusto;
-    h+='<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06)"><div style="display:flex;align-items:center;gap:7px;font-size:0.76rem"><span>'+i.icona+'</span><span style="flex:1">'+i.nome+'</span>'+(g&&g.ph!=null?'<span style="font-size:0.62rem;color:var(--muted)">pH '+g.ph+'</span>':'')+'</div>';
+  msPiatto.forEach(id=>{ const i=msIng(id), g=i.gusto, q=msQuantita[id]!=null?msQuantita[id]:100, unita=msUnita(id);
+    h+='<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06)"><div style="display:flex;align-items:center;gap:7px;font-size:0.76rem"><span>'+i.icona+'</span><span style="flex:1">'+i.nome+' <span style="color:var(--muted);font-size:0.62rem">('+q+unita+')</span></span>'+(g&&g.ph!=null?'<span style="font-size:0.62rem;color:var(--muted)">pH '+g.ph+'</span>':'')+'</div>';
     if(g&&g.fonteUSDA){
-      h+='<div style="font-size:0.62rem;color:var(--muted);margin-top:2px">grasso '+(g.grasso??'—')+'g · zuccheri '+(g.zuccheri??'—')+'g · glutammato '+(g.glutammato_g??'—')+'g</div>';
+      const f=msFattore(id);
+      h+='<div style="font-size:0.62rem;color:var(--muted);margin-top:2px">grasso '+((g.grasso||0)*f).toFixed(1)+'g · zuccheri '+((g.zuccheri||0)*f).toFixed(1)+'g · glutammato '+(g.glutammato_g!=null?((g.glutammato_g*f).toFixed(2)+'g'):'—')+' <span style="opacity:0.6">(su '+q+unita+')</span></div>';
     } else h+='<div style="font-size:0.62rem;color:var(--gold);margin-top:2px">dato gusto non ancora caricato</div>';
     h+='</div>';
   });
-  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">USDA FoodData Central + pH FDA · '+conDati.length+'/'+ingr.length+' con dato completo</div></div>';
+  h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">USDA FoodData Central + pH FDA · '+idConDati.length+'/'+ingr.length+' con dato completo</div></div>';
 
   p5.innerHTML=h+msSuggerisci();
 }
 
 // ── Cosa aggiungerei: colma il buco del gusto mantenendo il legame ──
 function msSuggerisci(){
-  const ingr=msPiatto.map(id=>msIng(id));
-  const conD=ingr.filter(i=>i.gusto&&i.gusto.fonteUSDA);
+  const conD=msPiatto.filter(id=>{const i=msIng(id); return i.gusto&&i.gusto.fonteUSDA;});
   if(!conD.length) return '';
-  const grTot=conD.reduce((s,i)=>s+(i.gusto.grasso||0),0);
-  const gluTot=conD.reduce((s,i)=>s+(i.gusto.glutammato_g||0),0);
+  const grTot=conD.reduce((s,id)=>s+(msIng(id).gusto.grasso||0)*msFattore(id),0);
+  const gluTot=conD.reduce((s,id)=>s+(msIng(id).gusto.glutammato_g||0)*msFattore(id),0);
   const buchi=[];
   if(grTot<3) buchi.push('manca grasso: il piatto resta magro');
   if(gluTot<0.5) buchi.push('poco umami: rischia di sapere di poco');
@@ -3577,7 +3602,7 @@ async function msSalvaPiatto(){
     ponti.push({tra:[msIng(msPiatto[a]).nome, msIng(msPiatto[b]).nome], molecole:c.c, jaccard:c.j, principali:(c.m||[]).slice(0,4).map(m=>m.n)});
   }
   const rec={ nome, data:today(), ora:nowTime(), pesce:msPesce||null,
-    ingredienti: ingr.map(i=>({id:i.id,nome:i.nome,icona:i.icona,
+    ingredienti: ingr.map(i=>({id:i.id,nome:i.nome,icona:i.icona,quantita:msQuantita[i.id]!=null?msQuantita[i.id]:100,unita:msUnita(i.id),
       gusto:i.gusto&&i.gusto.fonteUSDA?{ph:i.gusto.ph,grasso:i.gusto.grasso,zuccheri:i.gusto.zuccheri,glutammato:i.gusto.glutammato_g}:null})),
     ponti };
   try{
@@ -3595,6 +3620,14 @@ function msApriPiatto(idsStr, pesce, docId){
   const ids=idsStr.split(',').map(Number).filter(n=>!isNaN(n)&&msIng(n));
   if(!ids.length){ alert('Piatto non ricostruibile'); return; }
   msPiatto=ids; msPesce=pesce||null; msDocCorrente=docId||null;
+  // Ripristina le quantità salvate; ai piatti salvati prima di questa funzione
+  // (senza campo quantita) assegna 100 di default — stesso comportamento di sempre.
+  msQuantita={};
+  const salvato=msPiattiCache.find(p=>p.docId===docId);
+  ids.forEach(id=>{
+    const voce=salvato && (salvato.ingredienti||[]).find(x=>Number(x.id)===id);
+    msQuantita[id]=(voce && voce.quantita!=null) ? voce.quantita : 100;
+  });
   msRenderTutto();
   const n=document.getElementById('msNomePiatto');
   if(n && docId) n.value=docId.split('_').slice(1).join('_').replace(/-/g,' ');
