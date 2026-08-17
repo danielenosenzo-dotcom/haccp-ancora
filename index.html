@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.26</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.27</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3201,6 +3201,7 @@ function msRenderMappa3D(){
     document.getElementById('msAvanguardia').insertAdjacentElement('afterend', box);
     box.style.cssText='border:1px solid var(--border);border-radius:12px;margin:16px 0 0;background:var(--card);overflow:hidden;position:relative';
     box.innerHTML='<div style="padding:9px 12px 0;font-size:0.72rem;color:var(--cream)">Mappa del piatto <span style="color:var(--muted)">(trascina per ruotare · tocca un ingrediente per toglierlo)</span></div>'
+      +'<div style="padding:4px 12px 0;font-size:0.6rem;color:var(--muted)">dimensione pallina = peso nel gusto (grasso+zuccheri+umami) · spessore raggio = legame aromatico col piatto</div>'
       +'<canvas id="ms3dCanvas" style="width:100%;height:230px;display:block;touch-action:none;cursor:grab"></canvas>';
     MS3D.box=box; MS3D.canvas=document.getElementById('ms3dCanvas'); MS3D.ctx=MS3D.canvas.getContext('2d');
     ms3dSetupEventi();
@@ -3225,6 +3226,23 @@ function msRenderMappa3D(){
     return { id:d.id, ing:d.ing, centro:false,
       x:r*Math.sin(ph)*Math.cos(th), y:r*Math.sin(ph)*Math.sin(th), z:r*Math.cos(ph),
       vx:0, vy:0, vz:0 };
+  });
+
+  // Peso-gusto di ogni ingrediente: quota di grasso+zuccheri+umami che porta
+  // sul totale del piatto — non un dato in più, solo gli stessi numeri già
+  // mostrati nel Bilanciamento, riletti come proporzione. Chi pesa di più nel
+  // piatto avrà la pallina più grande; chi pesa poco resta piccolo, anche se
+  // aromaticamente è ben legato (quello lo mostra invece lo spessore del raggio).
+  const conGusto=MS3D.nodes.filter(n=>!n.centro && n.ing.gusto && n.ing.gusto.fonteUSDA);
+  const totGusto=conGusto.reduce((s,n)=>{ const g=n.ing.gusto; return s+(g.grasso||0)+(g.zuccheri||0)+(g.glutammato_g||0); },0);
+  const nIngr=MS3D.nodes.filter(n=>!n.centro).length || 1;
+  MS3D.nodes.forEach(n=>{
+    if(n.centro) return;
+    const g=n.ing.gusto;
+    if(g && g.fonteUSDA && totGusto>0){
+      const quota=((g.grasso||0)+(g.zuccheri||0)+(g.glutammato_g||0))/totGusto;
+      n.pesoGusto=quota/(1/nIngr); // 1 = quota media, >1 pesa più della media, <1 meno
+    } else n.pesoGusto=1;
   });
 
   ms3dAvvia();
@@ -3342,7 +3360,11 @@ function ms3dDisegna(links){
       ctx.globalAlpha=1;
       return;
     }
-    const r=Math.max(3, 12*p.scale);
+    // Raggio della pallina = quanto quell'ingrediente pesa nel gusto del piatto
+    // (grasso+zuccheri+umami sul totale) — non l'aroma, quello è già lo spessore
+    // del raggio che lo collega al centro. Fattore limitato per restare leggibile.
+    const fattorePeso=Math.max(0.6, Math.min(1.9, n.pesoGusto||1));
+    const r=Math.max(3, 12*fattorePeso*p.scale);
     const col=MS3D_CAT_COLORI[n.ing.categoria]||'#8aa0ad';
     ctx.globalAlpha=fade;
     ctx.beginPath(); ctx.arc(p.sx,p.sy,r,0,Math.PI*2);
