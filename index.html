@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.30</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.31</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3467,7 +3467,17 @@ function ms3dSetupEventi(){
 }
 
 // ── Vista del piatto + innesto pesce ──────────────────────
-const MS_PESCI=[['Calamaro','🦑'],['Polpo','🐙'],['Seppia','🦑'],['Tonno','🍣'],['Gambero','🦐'],['Branzino','🐟'],['Ricciola','🐟'],['Sgombro','🐟']];
+const MS_PESCI=[
+  // base
+  ['Calamaro','🦑'],['Polpo','🐙'],['Seppia','🦑'],['Tonno','🍣'],['Gambero','🦐'],['Branzino','🐟'],['Ricciola','🐟'],['Sgombro','🐟'],
+  // molluschi / frutti di mare
+  ['Cozze','🦪'],['Vongole','🐚'],['Cannolicchi','🦪'],['Telline','🐚'],['Capesante','🦪'],
+  // la linea del ristorante
+  ['Tonno rosso','🍣'],['Tonno albacares','🍣'],['Palamita','🐟'],['Pesce spada','🐟'],['Baccalà dissalato','🐟'],
+  ['Salmone','🐟'],['Sogliola','🐟'],['Calamaro patagonico','🦑'],['Calamaro spillo','🦑'],
+  ['Gambero viola','🦐'],['Gambero bianco','🦐'],['Scampi','🦞'],['Aragosta','🦞'],
+  ['Gallinella','🐟'],['Sampietro','🐟'],
+];
 function msRenderVista(){
   let box=document.getElementById('msVista');
   if(!box){ box=document.createElement('div'); box.id='msVista'; document.getElementById('msPasso4').insertAdjacentElement('afterend', box); }
