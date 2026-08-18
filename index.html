@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.31</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.32</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3143,7 +3143,7 @@ function msRenderPonti(){
       h+=candidatiPonte.map(c=>'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,0.06)">'
         +'<span>'+c.i.icona+'</span><span style="flex:1;font-size:0.76rem;min-width:0">'+c.i.nome+'</span>'
         +'<span style="font-size:0.6rem;color:var(--muted);white-space:nowrap">'+debole.a.nome+' '+Math.round(c.jA*100)+' · '+debole.b.nome+' '+Math.round(c.jB*100)+'</span>'
-        +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>').join('');
+        +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0;width:auto" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>').join('');
     } else {
       h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:4px">Nessun ponte forte trovato in questi 17 ingredienti — con più ingredienti nel database sarà più facile trovarne uno.</div>';
     }
@@ -3193,7 +3193,7 @@ function msRenderAvanguardia(){
         +'<div style="display:flex;align-items:flex-start;gap:8px"><span style="font-size:1.05rem;line-height:1.3">'+c.i.icona+'</span>'
         +'<span style="flex:1;min-width:0"><b style="font-size:0.8rem;line-height:1.3">'+c.i.nome+'</b><div style="font-size:0.6rem;color:var(--muted)">'+c.i.categoria+'</div></span>'
         +'<span style="font-size:0.72rem;color:var(--gold-l);font-weight:700;white-space:nowrap;line-height:1.3">'+Math.round(c.punteggio)+'</span>'
-        +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0;flex-shrink:0" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>'
+        +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0;flex-shrink:0;width:auto" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>'
         +'<div style="font-size:0.6rem;color:var(--muted);margin-top:4px;padding-left:29px">aroma '+Math.round(c.legame*100)+'% · gusto: '+(c.gustoNota||'nessun vuoto colmato')+'</div>'
         +(mol?'<div style="font-size:0.62rem;color:var(--muted);margin-top:2px;padding-left:29px">ponte con '+c.migliore.ing.nome+' via '+mol+'</div>':'')
         +'</div>';
@@ -3406,7 +3406,7 @@ function ms3dDisegna(links){
         const nomeInput=document.getElementById('msNomePiatto');
         const nomePiatto=(nomeInput && nomeInput.value.trim()) ? nomeInput.value.trim() : 'il piatto';
         ctx.fillStyle='#f5f0e8'; ctx.font='700 '+Math.max(8,10*p.scale)+'px -apple-system,Segoe UI,sans-serif';
-        ctx.textAlign='center'; ctx.fillText('🍽️ '+nomePiatto, p.sx, p.sy+r+11*p.scale);
+        ctx.textAlign='center'; ctx.fillText(nomePiatto, p.sx, p.sy+r+11*p.scale);
       }
       ctx.globalAlpha=1;
       return;
@@ -3426,7 +3426,7 @@ function ms3dDisegna(links){
       ctx.fillStyle='#f5f0e8';
       ctx.font='700 '+Math.max(8,10*p.scale)+'px -apple-system,Segoe UI,sans-serif';
       ctx.textAlign='center';
-      ctx.fillText(n.ing.icona+' '+n.ing.nome, p.sx, p.sy+r+11*p.scale);
+      ctx.fillText(n.ing.nome, p.sx, p.sy+r+11*p.scale);
     }
     ctx.globalAlpha=1;
   });
@@ -3587,7 +3587,7 @@ function msSuggerisci(){
       +'<span style="font-size:0.66rem;color:var(--teal-l);white-space:nowrap">lega '+Math.round(c.legame*100)+'</span></div>'
       +'<div style="display:flex;align-items:center;gap:8px;margin-top:4px">'
       +'<span style="flex:1;font-size:0.62rem;color:var(--gold);min-width:0">'+c.colma+'</span>'
-      +'<button class="btn btn-o" style="padding:4px 12px;font-size:0.68rem;margin:0;white-space:nowrap" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div></div>').join('');
+      +'<button class="btn btn-o" style="padding:4px 12px;font-size:0.68rem;margin:0;white-space:nowrap;width:auto" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div></div>').join('');
   h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:8px">"lega" = affinità col più debole del piatto</div></div>';
   return h;
 }
@@ -3709,8 +3709,8 @@ function msRigaPiatto(p){
       +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'+(p.ingredienti||[]).map(i=>
         '<span style="border:1px solid var(--border);border-radius:999px;padding:3px 8px;font-size:0.68rem">'+i.icona+' '+i.nome+'</span>').join('')+'</div>'
       +'<div style="display:flex;gap:6px">'
-      +'<button class="btn btn-o" style="padding:5px 11px;font-size:0.68rem;margin:0" onclick="msApriPiatto(\''+ids+'\',\''+(p.pesce||'')+'\',\''+p.docId+'\')">apri e modifica</button>'
-      +'<button class="btn btn-o" style="padding:5px 10px;font-size:0.68rem;margin:0" onclick="msEliminaPiatto(\''+p.docId+'\')">elimina</button>'
+      +'<button class="btn btn-o" style="padding:5px 11px;font-size:0.68rem;margin:0;width:auto" onclick="msApriPiatto(\''+ids+'\',\''+(p.pesce||'')+'\',\''+p.docId+'\')">apri e modifica</button>'
+      +'<button class="btn btn-o" style="padding:5px 10px;font-size:0.68rem;margin:0;width:auto" onclick="msEliminaPiatto(\''+p.docId+'\')">elimina</button>'
       +'</div></div>';
   }
   return h+'</div>';
