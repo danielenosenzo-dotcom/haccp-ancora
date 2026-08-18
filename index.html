@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.32</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.33</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3049,7 +3049,7 @@ function msRenderGriglia(){
   const box=document.getElementById('msGriglia');
   const gruppi={};
   MS.ingredienti.forEach(i=>{ const c=i.categoria||'Altro'; (gruppi[c]=gruppi[c]||[]).push(i); });
-  const ordine=['Verdure e ortaggi','Frutta','Frutta secca e semi','Erbe aromatiche','Spezie','Formaggi e latticini','Funghi e tartufi','Condimenti e grassi','Oli essenziali e aromatici','Bevande e infusi','Altro'];
+  const ordine=['Verdure e ortaggi','Frutta','Frutta secca e semi','Erbe aromatiche','Spezie','Formaggi e latticini','Carni e frattaglie','Funghi e tartufi','Condimenti e grassi','Oli essenziali e aromatici','Bevande e infusi','Altro'];
   box.innerHTML=ordine.filter(c=>gruppi[c]).map(cat=>{
     const ings=gruppi[cat];
     const nSel=ings.filter(i=>msPiatto.includes(i.id)).length;
@@ -3181,13 +3181,26 @@ function msRenderAvanguardia(){
     }
     const punteggio=legame*100*0.35 + gustoPunti*0.65;
     return {i, legame, migliore, gustoNota, punteggio};
-  }).filter(c=>c.legame>0.08).sort((a,b)=>b.punteggio-a.punteggio).slice(0,4);
+  }).filter(c=>c.legame>0.08).sort((a,b)=>b.punteggio-a.punteggio);
+
+  // Limite di 2 per categoria: senza questo, la categoria più numerosa (Verdure e
+  // ortaggi, 26 voci) vince quasi sempre per pura probabilità statistica — non
+  // perché sia davvero il ponte più interessante. Così la lista mostra varietà
+  // reale invece di ripetere sempre lo stesso mondo.
+  const perCategoria={}, candFiltrati=[];
+  for(const c of cand){
+    const n=perCategoria[c.i.categoria]||0;
+    if(n>=2) continue;
+    perCategoria[c.i.categoria]=n+1;
+    candFiltrati.push(c);
+    if(candFiltrati.length>=4) break;
+  }
 
   let h='<div style="font-size:0.72rem;color:var(--gold-l);margin:16px 0 6px">✦ Abbinamenti d\'avanguardia</div>';
   h+='<div style="border:1px solid var(--border-gold, rgba(201,168,76,0.3));border-radius:12px;padding:11px;background:linear-gradient(135deg,rgba(201,168,76,0.06),transparent)">';
   h+='<div style="font-size:0.66rem;color:var(--muted);margin-bottom:8px">Non i vicini di casa — ponti reali verso categorie che il piatto non ha ancora toccato. Ordinati per punteggio: 35% aroma + 65% quanto colmano un vuoto di gusto misurabile.</div>';
-  if(cand.length){
-    h+=cand.map(c=>{
+  if(candFiltrati.length){
+    h+=candFiltrati.map(c=>{
       const mol=(c.migliore.c.m||[]).slice(0,2).map(m=>m.n).join(', ');
       return '<div style="padding:8px 0;border-top:1px solid rgba(201,168,76,0.15)">'
         +'<div style="display:flex;align-items:flex-start;gap:8px"><span style="font-size:1.05rem;line-height:1.3">'+c.i.icona+'</span>'
@@ -3213,6 +3226,7 @@ const MS3D_CAT_COLORI = {
   'Verdure e ortaggi':'#4fd19e','Frutta':'#fc6f9b','Frutta secca e semi':'#c9a84c',
   'Erbe aromatiche':'#12a09f','Spezie':'#e0995c','Formaggi e latticini':'#f5f0e8',
   'Funghi e tartufi':'#8aa0ad','Condimenti e grassi':'#e8c97a','Oli essenziali e aromatici':'#a89bff',
+  'Carni e frattaglie':'#b5654a',
   'Bevande e infusi':'#e05c5c','Altro':'#8aa0ad'
 };
 let MS3D={ started:false, canvas:null, ctx:null, nodes:[], rotY:0.5, rotX:-0.2, zoom:1, dragging:false, lastX:0, lastY:0, pinchStart:null, pinchZoom:1, box:null };
