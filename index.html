@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.34</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.35</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3011,6 +3011,7 @@ async function msInit(){
   try{
     const r=await fetch('matrice-dati.json?v=2');
     MS=await r.json();
+    msCalcolaBaseline();
     stato.textContent='Aggiungi ingredienti: l’app calcola i ponti molecolari fra tutti e ti dice cosa manca.';
     if(!msPiatto.length && msIng(157)) msPiatto=[157];
     msRenderTutto();
@@ -3024,6 +3025,22 @@ function msAromaId(id){ const i=msIng(id); return (i&&i.aromaAlias)||id; }
 function msCoppia(a,b){ a=msAromaId(a); b=msAromaId(b); if(a===b) return {j:0,c:0,m:[]}; return MS.coppie[a+'-'+b] || MS.coppie[b+'-'+a] || {j:0,c:0,m:[]}; }
 // forza di legame di un candidato col piatto = affinita col PIU DEBOLE dei presenti
 function msLegame(id){ return msPiatto.length ? Math.min(...msPiatto.map(x=>msCoppia(x,id).j)) : 0; }
+
+// Promiscuità media di ogni ingrediente: alcuni (soprattutto ortaggi/radici come
+// Cardo, Carciofo, Patata dolce) condividono un "fondo vegetale" comune con quasi
+// tutto e vincono sempre per valore assoluto, mentre ingredienti selettivi (oli
+// essenziali, tartufo, spezie concentrate) restano sempre indietro anche quando il
+// loro legame è insolitamente forte. Calcolata una volta al caricamento, usata solo
+// per gli Abbinamenti d'avanguardia — normalizza "quanto lega" per "quanto lega di
+// solito", premiando i bridge davvero specifici a QUESTO piatto.
+function msCalcolaBaseline(){
+  MS.baseline={};
+  MS.ingredienti.forEach(i=>{
+    let somma=0, n=0;
+    MS.ingredienti.forEach(k=>{ if(k.id===i.id) return; somma+=msCoppia(i.id,k.id).j; n++; });
+    MS.baseline[i.id]=n?(somma/n)||0.01:0.01;
+  });
+}
 
 function msAggiungi(id){ if(!msPiatto.includes(id)){ msPiatto.push(id); msQuantita[id]=100; } msRenderTutto(); }
 function msTogli(id){ msPiatto=msPiatto.filter(x=>x!==id); delete msQuantita[id]; msRenderTutto(); }
@@ -3180,7 +3197,12 @@ function msRenderAvanguardia(){
       if(grTotP<3 && (g.grasso||0)>5) gustoNota='porta anche grasso ('+g.grasso+'g)';
       else if(gluTotP<0.5 && (g.glutammato_g||0)>0.3) gustoNota='porta anche umami ('+g.glutammato_g+'g)';
     }
-    const punteggio=legame*100; // solo aroma: il gusto resta un'informazione a parte, non pesa sull'ordine
+    // Ordino per legame relativo alla promiscuità media del candidato, non per
+    // legame assoluto: altrimenti vincono sempre gli stessi 3-4 "generalisti"
+    // (Funghi, Cocco, Pomodoro, Asparago...) che legano bene con tutto sempre,
+    // invece dei ponti davvero specifici a questo piatto.
+    const baseline=(MS.baseline&&MS.baseline[i.id])||0.01;
+    const punteggio=legame/baseline;
     return {i, legame, migliore, gustoNota, punteggio};
   }).filter(c=>c.legame>0.08).sort((a,b)=>b.punteggio-a.punteggio);
 
@@ -3188,25 +3210,31 @@ function msRenderAvanguardia(){
   // ortaggi, 26 voci) vince quasi sempre per pura probabilità statistica — non
   // perché sia davvero il ponte più interessante. Così la lista mostra varietà
   // reale invece di ripetere sempre lo stesso mondo.
-  const perCategoria={}, candFiltrati=[];
+  // Anche la stessa "sorgente aromatica" non può ripetersi: Panna fresca, Burro
+  // chiarificato e Strutto sono categorizzati diversamente da Burro ma condividono
+  // esattamente il suo stesso aroma (aromaAlias) — senza questo controllo
+  // sembrerebbero 3 suggerimenti diversi quando in realtà è sempre lo stesso ponte.
+  const perCategoria={}, fontiUsate=new Set(), candFiltrati=[];
   for(const c of cand){
     const n=perCategoria[c.i.categoria]||0;
-    if(n>=2) continue;
+    const fonte=msAromaId(c.i.id);
+    if(n>=2 || fontiUsate.has(fonte)) continue;
     perCategoria[c.i.categoria]=n+1;
+    fontiUsate.add(fonte);
     candFiltrati.push(c);
     if(candFiltrati.length>=4) break;
   }
 
   let h='<div style="font-size:0.72rem;color:var(--gold-l);margin:16px 0 6px">✦ Abbinamenti d\'avanguardia</div>';
   h+='<div style="border:1px solid var(--border-gold, rgba(201,168,76,0.3));border-radius:12px;padding:11px;background:linear-gradient(135deg,rgba(201,168,76,0.06),transparent)">';
-  h+='<div style="font-size:0.66rem;color:var(--muted);margin-bottom:8px">Non i vicini di casa — ponti reali verso categorie che il piatto non ha ancora toccato. Ordinati solo per legame aromatico (Jaccard); se un candidato colma anche un vuoto di gusto lo segnalo a parte, ma non pesa sull\'ordine.</div>';
+  h+='<div style="font-size:0.66rem;color:var(--muted);margin-bottom:8px">Non i vicini di casa — ponti reali verso categorie che il piatto non ha ancora toccato. Ordinati per quanto il legame è insolito per quell\'ingrediente, non solo per quanto è alto — altrimenti vincono sempre gli stessi generalisti (funghi, pomodoro...) che legano bene con tutto.</div>';
   if(candFiltrati.length){
     h+=candFiltrati.map(c=>{
       const mol=(c.migliore.c.m||[]).slice(0,2).map(m=>m.n).join(', ');
       return '<div style="padding:8px 0;border-top:1px solid rgba(201,168,76,0.15)">'
         +'<div style="display:flex;align-items:flex-start;gap:8px"><span style="font-size:1.05rem;line-height:1.3">'+c.i.icona+'</span>'
         +'<span style="flex:1;min-width:0"><b style="font-size:0.8rem;line-height:1.3">'+c.i.nome+'</b><div style="font-size:0.6rem;color:var(--muted)">'+c.i.categoria+'</div></span>'
-        +'<span style="font-size:0.72rem;color:var(--gold-l);font-weight:700;white-space:nowrap;line-height:1.3">'+Math.round(c.punteggio)+'</span>'
+        +'<span style="font-size:0.72rem;color:var(--gold-l);font-weight:700;white-space:nowrap;line-height:1.3">'+Math.round(c.legame*100)+'</span>'
         +'<button class="btn btn-o" style="padding:3px 9px;font-size:0.64rem;margin:0;flex-shrink:0;width:auto" onclick="msAggiungi('+c.i.id+')">aggiungi</button></div>'
         +(c.gustoNota?'<div style="font-size:0.6rem;color:var(--muted);margin-top:4px;padding-left:29px">'+c.gustoNota+'</div>':'')
         +(mol?'<div style="font-size:0.62rem;color:var(--muted);margin-top:2px;padding-left:29px">ponte con '+c.migliore.ing.nome+' via '+mol+'</div>':'')
