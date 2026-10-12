@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.36</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.37</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -2279,13 +2279,17 @@ function savePulizia(tipo){
   alert(`✅ Registrato!\n${totFatte} su ${totVoci} voci completate.`);
 }
 
+const pulizieMostraTutte={giornaliera:false, settimanale:false, mensile:false};
+function pulizieToggleTutte(tipo){ pulizieMostraTutte[tipo]=!pulizieMostraTutte[tipo]; renderPulizieLog(tipo); }
 function renderPulizieLog(tipo){
   const logId=tipo==='giornaliera'?'pulGiornaliераLog':tipo==='settimanale'?'pulSettimanaleLog':'pulMensileLog';
   const box=document.getElementById(logId);
   if(!box) return;
   const pulizie=ls('pulizie_'+tipo);
   if(!pulizie.length){ box.innerHTML='<div class="empty"><div class="empty-icon">🧼</div><div class="empty-text">Nessuna registrazione</div></div>'; return; }
-  box.innerHTML=pulizie.slice(0,10).map(p=>{
+  const tutte=pulizieMostraTutte[tipo];
+  const elenco=tutte?pulizie:pulizie.slice(0,10);
+  let html=elenco.map(p=>{
     const pct=Math.round(p.totFatte/p.totVoci*100);
     const color=pct===100?'var(--success)':pct>=50?'var(--gold)':'var(--danger)';
     return `<div class="li" style="flex-direction:column;align-items:flex-start;gap:5px;border-left:3px solid ${color}">
@@ -2298,6 +2302,10 @@ function renderPulizieLog(tipo){
       ${p.note?`<div class="li-meta" style="color:var(--gold)">📝 ${p.note}</div>`:''}
     </div>`;
   }).join('');
+  if(pulizie.length>10){
+    html+=`<button class="btn btn-o" style="margin-top:8px;width:auto" onclick="pulizieToggleTutte('${tipo}')">${tutte?'▲ Mostra meno':'▼ Mostra tutte ('+pulizie.length+')'}</button>`;
+  }
+  box.innerHTML=html;
 }
 
 // ═══════════════════════════════════════════════════════
