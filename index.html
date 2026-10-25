@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.37</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.38</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -199,6 +199,7 @@ textarea{resize:vertical;min-height:65px}
 <nav class="nav">
   <button class="nb on" onclick="show('home',this)"><span class="ic">🏠</span>Home</button>
   <button class="nb" onclick="show('temp',this)"><span class="ic">🌡️</span>Temp</button>
+  <button class="nb" onclick="show('abbatt',this)"><span class="ic">🧊</span>Abbatt.</button>
   <button class="nb" onclick="show('lotti',this)"><span class="ic">📦</span>Lotti</button>
   <button class="nb" onclick="show('scad',this)"><span class="ic">📅</span>Scad.</button>
   <button class="nb" onclick="show('label',this)"><span class="ic">🏷️</span>Label</button>
@@ -265,6 +266,46 @@ textarea{resize:vertical;min-height:65px}
 </section>
 
 
+
+<!-- ═══════════════════════════════ ABBATTIMENTO ═══════════════════════════════ -->
+<section class="sec" id="abbatt">
+  <div class="card">
+    <div class="card-t">🧊 Registrazione Abbattimento</div>
+    <label>Prodotto</label>
+    <input type="text" id="abProd" list="abProdList" placeholder="es. Tonno Rosso o cerca dal catalogo...">
+    <datalist id="abProdList"></datalist>
+    <label>Tipo trattamento</label>
+    <select id="abTipo" onchange="updateAbbattSoglia()">
+      <option value="rapido">❄️ Abbattimento rapido (catena del freddo, cotti/freschi)</option>
+      <option value="anisakis">🐟 Bonifica Anisakis (prodotto da consumare crudo/marinato)</option>
+    </select>
+    <div id="abSogliaInfo" style="font-size:0.68rem;color:var(--muted);margin-top:4px;line-height:1.5"></div>
+    <label>Data e ora inizio</label>
+    <input type="datetime-local" id="abInizio" oninput="valutaEsitoAbbattimento()">
+    <label>Data e ora fine</label>
+    <input type="datetime-local" id="abFine" oninput="valutaEsitoAbbattimento()">
+    <label>Temperatura al cuore raggiunta (°C)</label>
+    <input type="number" id="abTemp" placeholder="es. -20" step="0.1" oninput="valutaEsitoAbbattimento()">
+    <label>Esito</label>
+    <select id="abEsito">
+      <option value="ok">✅ Conforme</option>
+      <option value="ko">❌ Non conforme</option>
+    </select>
+    <div id="abEsitoSuggerito" style="font-size:0.68rem;color:var(--gold);margin-top:4px"></div>
+    <label>Operatore</label>
+    <select id="abOp" onchange="checkOtherOp('abOp','abOpAlt')">
+      <option value="">— Seleziona —</option>
+    </select>
+    <input type="text" id="abOpAlt" placeholder="Nome operatore" style="display:none;margin-top:8px">
+    <label>Note</label>
+    <input type="text" id="abNote" placeholder="es. abbattitore n.1, vaschetta...">
+    <button class="btn btn-g" onclick="saveAbbattimento()" style="margin-top:14px">💾 Registra Abbattimento</button>
+  </div>
+  <div class="card">
+    <div class="card-t">📋 Abbattimenti Registrati</div>
+    <div id="abbattLogs"><div class="empty"><div class="empty-icon">🧊</div><div class="empty-text">Nessun abbattimento registrato</div></div></div>
+  </div>
+</section>
 
 <!-- ═══════════════════════════════ LOTTI ═══════════════════════════════ -->
 <section class="sec" id="lotti">
@@ -830,7 +871,7 @@ const DB_KEYS = [
   'customProducts','productOverrides','safimProducts',
   'pulizie_giornaliera','pulizie_settimanale','pulizie_mensile',
   'mag_entrate','mag_uscite','mag_inventari',
-  'ingredienti','ricette'
+  'ingredienti','ricette','abbattimenti'
 ];
 
 const DB = {};
@@ -859,6 +900,7 @@ function rerender(key){
   switch(key){
     case 'temps':           renderHome(); break;
     case 'lotti':           renderLottiLogs(); renderHome(); break;
+    case 'abbattimenti':    renderAbbattLogs(); renderHome(); break;
     case 'scadenze':        renderScadenze(); renderHome(); break;
     case 'labels':          renderHome(); break;
     case 'activity':        renderHome(); break;
@@ -925,7 +967,7 @@ function getOp(selId,altId){
 
 function populateOpSelects(){
   const ops=ls('ops');
-  const selIds=['tOp','cOp','lOp','lbOp','qOp','batchOp','pulGOp','pulSOp','pulMOp','rgOp'];
+  const selIds=['tOp','cOp','lOp','abOp','lbOp','qOp','batchOp','pulGOp','pulSOp','pulMOp','rgOp'];
   selIds.forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel)return;
@@ -955,6 +997,7 @@ function show(id,btn){
   if(btn) btn.classList.add('on');
   if(id==='home') renderHome();
   if(id==='lotti') renderLottiLogs();
+  if(id==='abbatt'){ renderAbProdList(); updateAbbattSoglia(); renderAbbattLogs(); }
   if(id==='scad'){ eliminaScaduteAuto(); renderScadenze(); }
   if(id==='temp'){ checkRegOggi(); renderStoricoGiornaliero(); }
   if(id==='label') renderProducts('Tutti');
@@ -1271,6 +1314,108 @@ function renderLottiLogs(){
       ${l.link?`<a href="${l.link}" target="_blank" style="font-size:0.72rem;color:var(--teal-l);text-decoration:none">🔗 Apri fattura su Drive</a>`:''}
     </div>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// ABBATTIMENTO / BONIFICA ANISAKIS
+// Soglie da Reg. CE 853/2004, Allegato III, Sez. VIII, Cap. III:
+// bonifica anisakis = -20°C per almeno 24h in tutte le parti del prodotto
+// (o -35°C per almeno 15h). L'abbattimento rapido "catena del freddo" non ha
+// una soglia unica di legge: qui si usa -18°C come riferimento pratico comune.
+// ═══════════════════════════════════════════════════════
+const AB_SOGLIE = {
+  anisakis: { temp:-20, ore:24, testo:'Bonifica Anisakis (Reg. CE 853/2004, All. III Sez. VIII Cap. III): -20°C per almeno 24 ore in tutte le parti del prodotto, oppure -35°C per almeno 15 ore. Obbligatoria per pesce destinato a consumo crudo, marinato o poco cotto.' },
+  rapido:   { temp:-18, ore:0,  testo:'Abbattimento rapido: riferimento pratico -18°C al cuore del prodotto. Nessuna soglia di legge unica — segui le indicazioni del tuo manuale di autocontrollo.' }
+};
+
+function renderAbProdList(){
+  const dl=document.getElementById('abProdList');
+  if(!dl) return;
+  dl.innerHTML=getAllProducts().map(p=>`<option value="${p.name}">`).join('');
+}
+
+function updateAbbattSoglia(){
+  const tipo=document.getElementById('abTipo').value;
+  const s=AB_SOGLIE[tipo];
+  document.getElementById('abSogliaInfo').textContent=s.testo;
+  valutaEsitoAbbattimento();
+}
+
+function valutaEsitoAbbattimento(){
+  const tipo=document.getElementById('abTipo').value;
+  const s=AB_SOGLIE[tipo];
+  const temp=parseFloat(document.getElementById('abTemp').value);
+  const inizio=document.getElementById('abInizio').value;
+  const fine=document.getElementById('abFine').value;
+  const box=document.getElementById('abEsitoSuggerito');
+  if(isNaN(temp)||!inizio||!fine){ box.textContent=''; return; }
+  const ore=(new Date(fine)-new Date(inizio))/3600000;
+  const tempOk=temp<=s.temp;
+  const oreOk=ore>=s.ore;
+  if(tempOk && oreOk){
+    box.textContent='✅ Parametri conformi alla soglia selezionata ('+ore.toFixed(1)+'h, '+temp+'°C) — esito impostato di conseguenza, puoi comunque correggerlo.';
+    box.style.color='var(--success)';
+    document.getElementById('abEsito').value='ok';
+  } else {
+    box.textContent='⚠️ Non raggiunge la soglia ('+ore.toFixed(1)+'h, '+temp+'°C contro '+s.ore+'h/'+s.temp+'°C richiesti) — controlla prima di confermare come conforme.';
+    box.style.color='var(--gold)';
+    document.getElementById('abEsito').value='ko';
+  }
+}
+
+function saveAbbattimento(){
+  const prod=document.getElementById('abProd').value.trim();
+  const tipo=document.getElementById('abTipo').value;
+  const inizio=document.getElementById('abInizio').value;
+  const fine=document.getElementById('abFine').value;
+  const temp=document.getElementById('abTemp').value;
+  const esito=document.getElementById('abEsito').value;
+  const op=getOp('abOp','abOpAlt');
+  const note=document.getElementById('abNote').value.trim();
+  if(!prod){ alert('Inserisci il prodotto'); return; }
+  if(!inizio||!fine){ alert('Inserisci data/ora di inizio e fine'); return; }
+  if(temp===''){ alert('Inserisci la temperatura raggiunta'); return; }
+
+  const ore=(new Date(fine)-new Date(inizio))/3600000;
+  const abb=ls('abbattimenti');
+  abb.unshift({id:uid(),date:today(),prod,tipo,inizio,fine,ore:+ore.toFixed(1),temp:parseFloat(temp),esito,op,note});
+  lss('abbattimenti',abb);
+  addActivity(`🧊 Abbattimento ${prod} — ${tipo==='anisakis'?'Bonifica Anisakis':'Rapido'} (${esito==='ok'?'conforme':'NON conforme'})`);
+
+  document.getElementById('abProd').value='';
+  document.getElementById('abInizio').value='';
+  document.getElementById('abFine').value='';
+  document.getElementById('abTemp').value='';
+  document.getElementById('abNote').value='';
+  document.getElementById('abEsitoSuggerito').textContent='';
+  renderAbbattLogs();
+  alert('✅ Abbattimento registrato');
+}
+
+let abbattMostraTutte=false;
+function abbattToggleTutte(){ abbattMostraTutte=!abbattMostraTutte; renderAbbattLogs(); }
+function renderAbbattLogs(){
+  const abb=ls('abbattimenti');
+  const box=document.getElementById('abbattLogs');
+  if(!box) return;
+  if(!abb.length){ box.innerHTML='<div class="empty"><div class="empty-icon">🧊</div><div class="empty-text">Nessun abbattimento registrato</div></div>'; return; }
+  const elenco=abbattMostraTutte?abb:abb.slice(0,10);
+  let html=elenco.map(a=>{
+    const esitoBadge=a.esito==='ok'?'<span class="badge b-g">✅ Conforme</span>':'<span class="badge b-r">❌ Non conforme</span>';
+    const tipoLabel=a.tipo==='anisakis'?'🐟 Bonifica Anisakis':'❄️ Abbattimento rapido';
+    return `<div class="li" style="flex-direction:column;align-items:flex-start;gap:5px;border-left:3px solid var(--teal)">
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+        <span style="font-weight:600;font-size:0.88rem">${a.prod}</span>${esitoBadge}
+      </div>
+      <div class="li-meta">${tipoLabel} — ${a.temp}°C — ${a.ore}h</div>
+      <div class="li-meta">${a.date} — Op: ${a.op}</div>
+      ${a.note?`<div class="li-meta" style="color:var(--gold)">📝 ${a.note}</div>`:''}
+    </div>`;
+  }).join('');
+  if(abb.length>10){
+    html+=`<button class="btn btn-o" style="margin-top:8px;width:auto" onclick="abbattToggleTutte()">${abbattMostraTutte?'▲ Mostra meno':'▼ Mostra tutte ('+abb.length+')'}</button>`;
+  }
+  box.innerHTML=html;
 }
 
 // ═══════════════════════════════════════════════════════
