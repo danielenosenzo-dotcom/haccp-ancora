@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.38</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.39</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -271,6 +271,9 @@ textarea{resize:vertical;min-height:65px}
 <section class="sec" id="abbatt">
   <div class="card">
     <div class="card-t">🧊 Registrazione Abbattimento</div>
+    <label>📷 Carica screenshot da Cosmo (opzionale — compila i campi da sola)</label>
+    <input type="file" id="abScreenshot" accept="image/*" onchange="leggiScreenshotAbbattimento(this)">
+    <div id="abOcrStatus" style="font-size:0.68rem;color:var(--muted);margin-top:4px"></div>
     <label>Prodotto</label>
     <input type="text" id="abProd" list="abProdList" placeholder="es. Tonno Rosso o cerca dal catalogo...">
     <datalist id="abProdList"></datalist>
@@ -1327,6 +1330,86 @@ const AB_SOGLIE = {
   anisakis: { temp:-20, ore:24, testo:'Bonifica Anisakis (Reg. CE 853/2004, All. III Sez. VIII Cap. III): -20°C per almeno 24 ore in tutte le parti del prodotto, oppure -35°C per almeno 15 ore. Obbligatoria per pesce destinato a consumo crudo, marinato o poco cotto.' },
   rapido:   { temp:-18, ore:0,  testo:'Abbattimento rapido: riferimento pratico -18°C al cuore del prodotto. Nessuna soglia di legge unica — segui le indicazioni del tuo manuale di autocontrollo.' }
 };
+
+// ── Lettura automatica screenshot Cosmo (OCR nel browser, nessun server) ──
+// Riconosce il formato della schermata "Dati HACCP abbattitore" di CosmoApp:
+// titolo ciclo, Inizio/Fine, Esito, tabella Data-Ora/T.Camera/T.Cuore.
+// L'esito NON viene preso dal testo Cosmo ("terminato forzatamente" capita
+// spesso anche per cicli validi, es. conservazione fermata a mano): lo stesso
+// calcolo sulle soglie normative (valutaEsitoAbbattimento) resta l'unica fonte.
+let abTesseractCaricato=false;
+function caricaTesseract(){
+  return new Promise((resolve, reject)=>{
+    if(abTesseractCaricato || window.Tesseract){ resolve(); return; }
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload=()=>{ abTesseractCaricato=true; resolve(); };
+    s.onerror=()=>reject(new Error('Impossibile caricare il lettore OCR (serve connessione internet)'));
+    document.head.appendChild(s);
+  });
+}
+
+function msgOcr(testo, colore){
+  const el=document.getElementById('abOcrStatus');
+  if(el){ el.textContent=testo; el.style.color=colore||'var(--muted)'; }
+}
+
+function dataOraInputValue(gg,mm,aaaa,hh,min){
+  if(aaaa.length===2) aaaa='20'+aaaa;
+  return aaaa+'-'+mm+'-'+gg+'T'+hh+':'+min;
+}
+
+async function leggiScreenshotAbbattimento(input){
+  const file=input.files[0];
+  if(!file) return;
+  msgOcr('⏳ Carico il lettore OCR...');
+  try{
+    await caricaTesseract();
+    msgOcr('🔎 Sto leggendo lo screenshot (può volerci qualche secondo)...');
+    const { data:{ text } } = await Tesseract.recognize(file, 'ita+eng');
+
+    const righe=text.split('\n').map(r=>r.trim()).filter(Boolean);
+    let trovati=[];
+
+    // Titolo ciclo: la prima riga leggibile prima di "Inizio:"
+    const idxInizio=righe.findIndex(r=>/inizio/i.test(r));
+    if(idxInizio>0){
+      const titolo=righe.slice(0,idxInizio).find(r=>r.length>2 && !/dati haccp/i.test(r));
+      if(titolo){ document.getElementById('abProd').value=titolo; trovati.push('prodotto/ciclo'); }
+    }
+
+    const mInizio=text.match(/[Ii]nizio[:\s]*(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
+    if(mInizio){
+      document.getElementById('abInizio').value=dataOraInputValue(mInizio[1].padStart(2,'0'),mInizio[2].padStart(2,'0'),mInizio[3],mInizio[4].padStart(2,'0'),mInizio[5]);
+      trovati.push('inizio');
+    }
+    const mFine=text.match(/[Ff]ine[:\s]*(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
+    if(mFine){
+      document.getElementById('abFine').value=dataOraInputValue(mFine[1].padStart(2,'0'),mFine[2].padStart(2,'0'),mFine[3],mFine[4].padStart(2,'0'),mFine[5]);
+      trovati.push('fine');
+    }
+
+    // Tutte le righe della tabella temperature: prende l'ultima come lettura finale
+    const righeTemp=[...text.matchAll(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(\d{1,2}:\d{2}:\d{2})\s+(-?\d+[.,]?\d*)\s*°?\s*C/g)];
+    if(righeTemp.length){
+      const ultima=righeTemp[righeTemp.length-1];
+      document.getElementById('abTemp').value=ultima[3].replace(',','.');
+      trovati.push('temperatura finale ('+righeTemp.length+' letture trovate)');
+    }
+
+    if(document.getElementById('abInizio').value && document.getElementById('abFine').value){
+      valutaEsitoAbbattimento();
+    }
+
+    if(trovati.length){
+      msgOcr('✅ Letti: '+trovati.join(', ')+'. Controlla i campi prima di salvare — l\'OCR può sbagliare.', 'var(--success)');
+    } else {
+      msgOcr('⚠️ Non sono riuscito a leggere i dati da questa immagine — inserisci a mano.', 'var(--gold)');
+    }
+  }catch(e){
+    msgOcr('❌ Errore lettura OCR: '+(e.message||e)+' — inserisci a mano.', 'var(--danger)');
+  }
+}
 
 function renderAbProdList(){
   const dl=document.getElementById('abProdList');
