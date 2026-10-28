@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.41</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.42</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1477,6 +1477,16 @@ function saveAbbattimento(){
 
 let abbattMostraTutte=false;
 function abbattToggleTutte(){ abbattMostraTutte=!abbattMostraTutte; renderAbbattLogs(); }
+function formatDataOra(str){
+  if(!str || str.indexOf('T')<0) return '—';
+  const [d,t]=str.split('T');
+  const [aaaa,mm,gg]=d.split('-');
+  return gg+'/'+mm+'/'+aaaa+' '+t;
+}
+
+let abbattApertoId=null;
+function abbattToggleApri(id){ abbattApertoId=(abbattApertoId===id?null:id); renderAbbattLogs(); }
+
 function renderAbbattLogs(){
   const abb=ls('abbattimenti');
   const box=document.getElementById('abbattLogs');
@@ -1486,15 +1496,24 @@ function renderAbbattLogs(){
   let html=elenco.map(a=>{
     const esitoBadge=a.esito==='ok'?'<span class="badge b-g">✅ Conforme</span>':'<span class="badge b-r">❌ Non conforme</span>';
     const tipoLabel=a.tipo==='anisakis'?'🐟 Bonifica Anisakis':'❄️ Abbattimento rapido';
-    return `<div class="li" style="flex-direction:column;align-items:flex-start;gap:5px;border-left:3px solid var(--teal)">
-      <div style="display:flex;justify-content:space-between;width:100%;align-items:center;gap:8px">
+    const aperto=abbattApertoId===a.id;
+    let h=`<div class="li" style="flex-direction:column;align-items:flex-start;gap:5px;border-left:3px solid var(--teal)">
+      <div onclick="abbattToggleApri('${a.id}')" style="display:flex;justify-content:space-between;width:100%;align-items:center;gap:8px;cursor:pointer">
         <span style="font-weight:600;font-size:0.88rem;flex:1">${a.prod}</span>${esitoBadge}
-        <button onclick="delAbbattimento('${a.id}')" style="background:var(--danger);border:none;color:#fff;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;flex-shrink:0">🗑</button>
+        <span style="color:var(--muted);font-size:0.8rem">${aperto?'▾':'›'}</span>
       </div>
-      <div class="li-meta">${tipoLabel} — ${a.temp}°C — ${a.ore}h</div>
-      <div class="li-meta">${a.date} — Op: ${a.op}</div>
-      ${a.note?`<div class="li-meta" style="color:var(--gold)">📝 ${a.note}</div>`:''}
-    </div>`;
+      <div class="li-meta" style="cursor:pointer" onclick="abbattToggleApri('${a.id}')">${tipoLabel} — ${a.temp}°C — ${a.ore}h</div>
+      <div class="li-meta" style="cursor:pointer" onclick="abbattToggleApri('${a.id}')">${a.date} — Op: ${a.op}</div>`;
+    if(aperto){
+      h+=`<div style="width:100%;border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;padding-top:8px">
+        <div class="li-meta">🕐 Inizio: ${formatDataOra(a.inizio)}</div>
+        <div class="li-meta">🕐 Fine: ${formatDataOra(a.fine)}</div>
+        ${a.note?`<div class="li-meta" style="color:var(--gold)">📝 ${a.note}</div>`:'<div class="li-meta" style="color:var(--muted)">Nessuna nota</div>'}
+        <button onclick="delAbbattimento('${a.id}')" style="margin-top:8px;background:var(--danger);border:none;color:#fff;border-radius:6px;padding:5px 10px;font-size:0.72rem;cursor:pointer">🗑 Elimina</button>
+      </div>`;
+    }
+    h+='</div>';
+    return h;
   }).join('');
   if(abb.length>10){
     html+=`<button class="btn btn-o" style="margin-top:8px;width:auto" onclick="abbattToggleTutte()">${abbattMostraTutte?'▲ Mostra meno':'▼ Mostra tutte ('+abb.length+')'}</button>`;
