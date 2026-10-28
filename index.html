@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.42</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.43</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1503,7 +1503,7 @@ function renderAbbattLogs(){
         <span style="color:var(--muted);font-size:0.8rem">${aperto?'▾':'›'}</span>
       </div>
       <div class="li-meta" style="cursor:pointer" onclick="abbattToggleApri('${a.id}')">${tipoLabel} — ${a.temp}°C — ${a.ore}h</div>
-      <div class="li-meta" style="cursor:pointer" onclick="abbattToggleApri('${a.id}')">${a.date} — Op: ${a.op}</div>`;
+`;
     if(aperto){
       h+=`<div style="width:100%;border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;padding-top:8px">
         <div class="li-meta">🕐 Inizio: ${formatDataOra(a.inizio)}</div>
