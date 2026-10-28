@@ -190,7 +190,7 @@ textarea{resize:vertical;min-height:65px}
 <div class="hdr">
   <div>
     <div class="hdr-logo">⚓ L'Ancora</div>
-    <div class="hdr-sub">Autocontrollo HACCP · v11.40</div>
+    <div class="hdr-sub">Autocontrollo HACCP · v11.41</div>
   </div>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -1487,8 +1487,9 @@ function renderAbbattLogs(){
     const esitoBadge=a.esito==='ok'?'<span class="badge b-g">✅ Conforme</span>':'<span class="badge b-r">❌ Non conforme</span>';
     const tipoLabel=a.tipo==='anisakis'?'🐟 Bonifica Anisakis':'❄️ Abbattimento rapido';
     return `<div class="li" style="flex-direction:column;align-items:flex-start;gap:5px;border-left:3px solid var(--teal)">
-      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
-        <span style="font-weight:600;font-size:0.88rem">${a.prod}</span>${esitoBadge}
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center;gap:8px">
+        <span style="font-weight:600;font-size:0.88rem;flex:1">${a.prod}</span>${esitoBadge}
+        <button onclick="delAbbattimento('${a.id}')" style="background:var(--danger);border:none;color:#fff;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;flex-shrink:0">🗑</button>
       </div>
       <div class="li-meta">${tipoLabel} — ${a.temp}°C — ${a.ore}h</div>
       <div class="li-meta">${a.date} — Op: ${a.op}</div>
@@ -1499,6 +1500,14 @@ function renderAbbattLogs(){
     html+=`<button class="btn btn-o" style="margin-top:8px;width:auto" onclick="abbattToggleTutte()">${abbattMostraTutte?'▲ Mostra meno':'▼ Mostra tutte ('+abb.length+')'}</button>`;
   }
   box.innerHTML=html;
+}
+
+function delAbbattimento(id){
+  if(!confirm('Eliminare questo abbattimento?')) return;
+  const abb=ls('abbattimenti').filter(a=>a.id!==id);
+  lss('abbattimenti',abb);
+  addActivity('🗑️ Abbattimento eliminato');
+  renderAbbattLogs();
 }
 
 // ═══════════════════════════════════════════════════════
